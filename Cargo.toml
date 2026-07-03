@@ -1,0 +1,3 @@
+[workspace]
+members = ["codegraph_core"]
+resolver = "2"

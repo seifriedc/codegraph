@@ -1,0 +1,36 @@
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "codegraph"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "duckdb>=1.1",
+    "typer>=0.12",
+    "tree-sitter>=0.23",
+    "tree-sitter-ada>=0.1",
+    "tree-sitter-c>=0.23",
+    "tree-sitter-cpp>=0.23",
+    "tree-sitter-python>=0.23",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[project.scripts]
+codegraph = "codegraph.cli:app"
+
+# Rust extension (codegraph_core) — built separately with `maturin develop`
+# once Rust is installed. See codegraph_core/ for the Cargo project.
+[tool.maturin]
+python-source = "."
+module-name = "codegraph.codegraph_core"
+manifest-path = "codegraph_core/Cargo.toml"
+features = ["pyo3/extension-module"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

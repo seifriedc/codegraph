@@ -1,0 +1,18 @@
+[package]
+name = "codegraph_core"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "codegraph_core"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.29", features = ["extension-module"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+tree-sitter = "0.23"
+tree-sitter-c = "0.23"
+tree-sitter-cpp = "0.23"
+# tree-sitter-ada will be added once available on crates.io
