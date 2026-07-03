@@ -7,7 +7,7 @@ import tree_sitter_c
 from codegraph.models import Node, Edge, stable_id, random_id
 from codegraph.parsers.base import (
     make_file_node, node_text, contains_edge,
-    imports_edge, calls_edge, external_node,
+    imports_edge, calls_edge, references_edge, external_node,
 )
 
 _LANGUAGE = Language(tree_sitter_c.language())
@@ -30,7 +30,6 @@ def parse(path: Path) -> tuple[list[Node], list[Edge]]:
 
 
 def _function_name(ts_node: TSNode, source: bytes) -> str | None:
-    """Extract function name from a function_definition node."""
     declarator = ts_node.child_by_field_name("declarator")
     if declarator is None:
         return None
@@ -38,7 +37,6 @@ def _function_name(ts_node: TSNode, source: bytes) -> str | None:
 
 
 def _declarator_name(ts_node: TSNode, source: bytes) -> str | None:
-    """Recursively unwrap pointer/function declarators to find the identifier."""
     if ts_node.type in ("identifier", "field_identifier"):
         return node_text(ts_node, source)
     if ts_node.type == "function_declarator":
@@ -49,7 +47,6 @@ def _declarator_name(ts_node: TSNode, source: bytes) -> str | None:
         inner = ts_node.child_by_field_name("declarator")
         if inner:
             return _declarator_name(inner, source)
-    # Fallback: first identifier descendant
     for child in ts_node.named_children:
         name = _declarator_name(child, source)
         if name:
@@ -70,12 +67,11 @@ def _walk(
     if ts_node.type == "function_definition":
         name = _function_name(ts_node, source)
         if name:
-            qname = name
             n = Node(
                 id=stable_id(f"function:c:{name}"),
                 kind="function",
                 name=name,
-                qualified_name=qname,
+                qualified_name=name,
                 file_path=file_path,
                 line_start=ts_node.start_point[0] + 1,
                 line_end=ts_node.end_point[0] + 1,
@@ -102,15 +98,24 @@ def _walk(
             )
             nodes.append(n)
             edges.append(contains_edge(parent, n, file_path, ts_node))
-            return  # struct body contains field declarations, not functions
+        return  # don't recurse into struct body
 
     elif ts_node.type == "preproc_include":
         _handle_include(ts_node, current, file_path, nodes, edges, source)
         return
 
     elif ts_node.type == "call_expression":
-        _handle_call(ts_node, current, file_path, edges, source)
-        # Don't recurse into call args — we'd double-count nested calls
+        _handle_call(ts_node, current, file_path, nodes, edges, source)
+        return
+
+    elif ts_node.type == "type_identifier":
+        # User-defined type reference (primitives are primitive_type, not type_identifier)
+        type_name = node_text(ts_node, source)
+        type_id = stable_id(f"type:c:{type_name}")
+        ext = external_node(type_name, "c", "type")
+        nodes.append(ext)
+        edges.append(references_edge(current.id, type_id, file_path, ts_node))
+        return
 
     for child in ts_node.named_children:
         _walk(child, current, file_path, nodes, edges, source)
@@ -122,7 +127,6 @@ def _handle_include(
 ) -> None:
     path_node = ts_node.child_by_field_name("path")
     if path_node is None:
-        # Try first named child
         path_node = ts_node.named_children[0] if ts_node.named_children else None
     if path_node:
         raw = node_text(path_node, source).strip("<>\"")
@@ -133,12 +137,13 @@ def _handle_include(
 
 def _handle_call(
     ts_node: TSNode, caller: Node, file_path: str,
-    edges: list[Edge], source: bytes,
+    nodes: list[Node], edges: list[Edge], source: bytes,
 ) -> None:
     fn_node = ts_node.child_by_field_name("function")
     if fn_node is None:
         return
     name = node_text(fn_node, source)
-    # Use stable_id based on name — may be resolved later if the definition is in-graph
     callee_id = stable_id(f"function:c:{name}")
+    ext = external_node(name, "c", "function")
+    nodes.append(ext)
     edges.append(calls_edge(caller, callee_id, file_path, ts_node))
