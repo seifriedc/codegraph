@@ -7,7 +7,7 @@ import tree_sitter_ada
 from codegraph.models import Node, Edge, stable_id, random_id
 from codegraph.parsers.base import (
     make_file_node, node_text, contains_edge,
-    imports_edge, calls_edge, inherits_edge, external_node,
+    imports_edge, calls_edge, inherits_edge, references_edge, external_node,
 )
 
 _LANGUAGE = Language(tree_sitter_ada.language())
@@ -68,6 +68,29 @@ def _subprogram_spec(ts_node: TSNode) -> TSNode | None:
         if child.type in ("function_specification", "procedure_specification"):
             return child
     return None
+
+
+def _resolve_type_name(raw: str, current_qname: str | None) -> str:
+    if "." not in raw and current_qname:
+        dot = current_qname.rfind(".")
+        return f"{current_qname[:dot]}.{raw}" if dot != -1 else raw
+    return raw
+
+
+def _emit_type_ref(
+    name_node: TSNode,
+    current: Node,
+    current_qname: str | None,
+    file_path: str,
+    nodes: list[Node],
+    edges: list[Edge],
+    source: bytes,
+) -> None:
+    raw = _selected_name(name_node, source)
+    type_name = _resolve_type_name(raw, current_qname)
+    type_id = stable_id(f"type:ada:{type_name}")
+    nodes.append(external_node(type_name, "ada", "type"))
+    edges.append(references_edge(current.id, type_id, file_path, name_node))
 
 
 def _walk(
@@ -170,13 +193,24 @@ def _walk(
                 edges.append(imports_edge(parent, ext, file_path, ts_node))
         return  # no further descent
 
-    elif ts_node.type == "procedure_call_statement":
-        name_child = ts_node.named_children[0] if ts_node.named_children else None
-        if name_child:
-            callee_name = _selected_name(name_child, source)
-            callee_id = stable_id(f"function:ada:{callee_name}")
-            edges.append(calls_edge(current, callee_id, file_path, ts_node))
-        return
+    elif ts_node.type in ("procedure_call_statement", "function_call"):
+        # Skip Ada attribute calls (e.g. Positive'Max) — they have a tick child
+        is_attribute_call = any(c.type == "tick" for c in ts_node.named_children)
+        if not is_attribute_call:
+            name_child = ts_node.named_children[0] if ts_node.named_children else None
+            if name_child:
+                raw_name = _selected_name(name_child, source)
+                # Resolve unqualified names against the enclosing package scope
+                if "." not in raw_name and current_qname:
+                    dot = current_qname.rfind(".")
+                    callee_name = f"{current_qname[:dot]}.{raw_name}" if dot != -1 else raw_name
+                else:
+                    callee_name = raw_name
+                callee_id = stable_id(f"function:ada:{callee_name}")
+                # Placeholder node so the callee is queryable even if not indexed
+                nodes.append(external_node(callee_name, "ada", "function"))
+                edges.append(calls_edge(current, callee_id, file_path, ts_node))
+        # Fall through to recurse into arguments — catches nested function calls
 
     elif ts_node.type == "component_declaration":
         # Collect all names before component_definition (e.g. "X, Y : Float" has two)
@@ -201,8 +235,37 @@ def _walk(
                 )
                 nodes.append(n)
                 edges.append(contains_edge(parent, n, file_path, ts_node))
-            current = n
-            current_qname = qname
+        # Fall through so component_definition child is visited for the type reference
+
+    elif ts_node.type == "component_definition":
+        # First identifier/selected_component is the field's type
+        name_child = next(
+            (c for c in ts_node.named_children if c.type in ("identifier", "selected_component")),
+            None
+        )
+        if name_child:
+            _emit_type_ref(name_child, current, current_qname, file_path, nodes, edges, source)
+        return
+
+    elif ts_node.type == "parameter_specification":
+        # Last identifier/selected_component is the type; preceding ones are param names
+        name_child = None
+        for c in ts_node.named_children:
+            if c.type in ("identifier", "selected_component"):
+                name_child = c
+        if name_child:
+            _emit_type_ref(name_child, current, current_qname, file_path, nodes, edges, source)
+        return
+
+    elif ts_node.type == "result_profile":
+        # Single child is the return type
+        name_child = next(
+            (c for c in ts_node.named_children if c.type in ("identifier", "selected_component")),
+            None
+        )
+        if name_child:
+            _emit_type_ref(name_child, current, current_qname, file_path, nodes, edges, source)
+        return
 
     elif ts_node.type == "generic_instantiation":
         raw_name, is_qualified = _first_name(ts_node, source)

@@ -1,10 +1,12 @@
 from __future__ import annotations
+import json
 from pathlib import Path
 from typing import Any
 
 import duckdb
 
 from codegraph.db import connect
+from codegraph.codegraph_core import traverse as _rust_traverse
 
 
 class Graph:
@@ -79,35 +81,27 @@ class Graph:
         direction: str = "out",
         max_depth: int = 1,
     ) -> list[dict]:
-        """BFS traversal. direction='out' follows source→target; 'in' follows target→source."""
-        if direction == "out":
-            join_col, reach_col = "source_id", "target_id"
-        else:
-            join_col, reach_col = "target_id", "source_id"
-
-        kind_filter, kind_params = "", []
+        """BFS traversal via Rust. direction='out' follows source→target; 'in' reverses."""
         if edge_kinds:
             ph = ", ".join("?" * len(edge_kinds))
-            kind_filter = f"AND e.kind IN ({ph})"
-            kind_params = list(edge_kinds)
-
-        sql = f"""
-            WITH RECURSIVE reach(node_id, depth) AS (
-                SELECT ?, 0
-                UNION
-                SELECT e.{reach_col}, r.depth + 1
-                FROM reach r
-                JOIN edges e ON e.{join_col} = r.node_id
-                WHERE r.depth < ? {kind_filter}
+            edges = self._fetchall(
+                f"SELECT source_id, target_id, kind FROM edges WHERE kind IN ({ph})",
+                list(edge_kinds),
             )
-            SELECT DISTINCT n.*
-            FROM reach r
-            JOIN nodes n ON n.id = r.node_id
-            WHERE r.node_id != ?
-            ORDER BY n.kind, n.qualified_name
-        """
-        params = [node_id, max_depth, *kind_params, node_id]
-        return self._fetchall(sql, params)
+        else:
+            edges = self._fetchall("SELECT source_id, target_id, kind FROM edges")
+
+        reachable_ids: list[str] = json.loads(
+            _rust_traverse(node_id, json.dumps(edges), edge_kinds or [], direction, max_depth)
+        )
+        if not reachable_ids:
+            return []
+
+        ph = ", ".join("?" * len(reachable_ids))
+        return self._fetchall(
+            f"SELECT * FROM nodes WHERE id IN ({ph}) ORDER BY kind, qualified_name",
+            reachable_ids,
+        )
 
     def transitive(
         self, node_id: str, edge_kind: str, direction: str = "out"

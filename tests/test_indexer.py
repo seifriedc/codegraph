@@ -98,6 +98,62 @@ def test_ada_record_components(tmp_db):
     assert "Y" in hier_names
 
 
+def test_ada_calls_edge(tmp_db):
+    idx = Indexer(tmp_db)
+    idx.index(FIXTURES / "ada")
+    idx.close()
+
+    g = Graph(tmp_db)
+    # Geometry.Distance calls Ada.Numerics.Elementary_Functions.Sqrt (a function_call)
+    distance = g.node_by_qualified_name("Geometry.Distance")
+    assert distance is not None
+    calls = g.edges_from(distance["id"], kinds=["calls"])
+    callee_ids = {e["target_id"] for e in calls}
+    from codegraph.models import stable_id
+    assert stable_id("function:ada:Ada.Numerics.Elementary_Functions.Sqrt") in callee_ids
+
+
+def test_ada_type_references_in_uses(tmp_db):
+    idx = Indexer(tmp_db)
+    idx.index(FIXTURES / "ada")
+    idx.close()
+
+    g = Graph(db_path=tmp_db)
+
+    # Distance(A, B : Point) return Float — should reference Geometry.Point (real node)
+    distance = g.node_by_qualified_name("Geometry.Distance")
+    assert distance is not None
+    used = g.nodes_used_by(distance["id"])
+    used_qnames = {n["qualified_name"] for n in used}
+    assert "Geometry.Point" in used_qnames
+
+    # The Geometry.Point reference should be the REAL node (not a placeholder)
+    point_in_used = next(n for n in used if n["qualified_name"] == "Geometry.Point")
+    assert point_in_used["file_path"] is not None
+
+    # Circle has Center : Point and Radius : Float
+    circle = g.node_by_qualified_name("Geometry.Circle")
+    assert circle is not None
+    used = g.nodes_used_by(circle["id"])
+    used_qnames = {n["qualified_name"] for n in used}
+    assert "Geometry.Point" in used_qnames
+
+
+def test_ada_unqualified_call_resolves_to_package_scope(tmp_db):
+    idx = Indexer(tmp_db)
+    idx.index(FIXTURES / "ada")
+    idx.close()
+
+    g = Graph(tmp_db)
+    # Translate calls Distance without qualification — should resolve to Geometry.Distance
+    translate = g.node_by_qualified_name("Geometry.Translate")
+    assert translate is not None
+    calls = g.edges_from(translate["id"], kinds=["calls"])
+    callee_ids = {e["target_id"] for e in calls}
+    from codegraph.models import stable_id
+    assert stable_id("function:ada:Geometry.Distance") in callee_ids
+
+
 def test_ada_imports_edge(tmp_db):
     idx = Indexer(tmp_db)
     idx.index(FIXTURES / "ada")

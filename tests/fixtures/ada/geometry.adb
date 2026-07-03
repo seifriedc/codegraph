@@ -10,6 +10,8 @@ package body Geometry is
    end Distance;
 
    procedure Translate (P : in out Point; Dx, Dy : Float) is
+      Origin : constant Point := (0.0, 0.0);
+      D : constant Float := Distance (P, Origin);
    begin
       P.X := P.X + Dx;
       P.Y := P.Y + Dy;

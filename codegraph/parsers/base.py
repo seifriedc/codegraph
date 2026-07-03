@@ -66,6 +66,17 @@ def inherits_edge(child: Node, parent_id: str, file_path: str, ts_node: TSNode) 
     )
 
 
+def references_edge(source_id: str, target_id: str, file_path: str, ts_node: TSNode) -> Edge:
+    return Edge(
+        kind="references",
+        source_id=source_id,
+        target_id=target_id,
+        file_path=file_path,
+        line=ts_node.start_point[0] + 1,
+        col=ts_node.start_point[1],
+    )
+
+
 def external_node(qualified_name: str, language: str, kind: str = "module") -> Node:
     """Placeholder node for an external/unresolved reference (e.g. a with'd Ada package)."""
     return Node(

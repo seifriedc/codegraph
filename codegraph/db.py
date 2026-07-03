@@ -37,7 +37,10 @@ _DDL = [
 _INSERT_NODE = """
     INSERT INTO nodes (id, kind, name, qualified_name, file_path, line_start, line_end, language, metadata)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT (id) DO NOTHING
+    ON CONFLICT (id) DO UPDATE SET
+        file_path  = COALESCE(excluded.file_path,  nodes.file_path),
+        line_start = COALESCE(excluded.line_start, nodes.line_start),
+        line_end   = COALESCE(excluded.line_end,   nodes.line_end)
 """
 
 _INSERT_EDGE = """

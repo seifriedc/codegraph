@@ -1,6 +1,7 @@
 use pyo3::prelude::*;
 
 mod graph;
+mod languages;
 mod parser;
 
 pub use parser::{ParsedEdge, ParsedNode};
@@ -10,12 +11,15 @@ fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
-/// Parse a source file and return (nodes, edges) as JSON strings.
-/// This is the fast path once the Python-only parsers are migrated.
+/// Parse a source file and return (nodes_json, edges_json).
 #[pyfunction]
-fn parse_file(_path: &str, _language: &str) -> PyResult<(String, String)> {
-    // Placeholder — Python parsers handle this until migration is complete.
-    Ok(("[]".to_string(), "[]".to_string()))
+fn parse_file(path: &str, language: &str) -> PyResult<(String, String)> {
+    let (nodes, edges) = languages::parse(path, language);
+    let nodes_json = serde_json::to_string(&nodes)
+        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
+    let edges_json = serde_json::to_string(&edges)
+        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
+    Ok((nodes_json, edges_json))
 }
 
 /// Return the raw AST of a source file as a JSON string.
@@ -25,18 +29,22 @@ fn get_ast(_path: &str, _language: &str) -> PyResult<String> {
     Ok("{}".to_string())
 }
 
-/// BFS/DFS graph traversal over nodes/edges provided as JSON.
+/// BFS traversal over an edge list provided as JSON.
+/// edges_json: [{"source_id": "...", "target_id": "...", "kind": "..."}, ...]
+/// Returns a JSON array of reachable node IDs (excluding start_id).
 #[pyfunction]
 fn traverse(
-    _start_id: &str,
-    _nodes_json: &str,
-    _edges_json: &str,
-    _edge_kinds: Vec<String>,
-    _direction: &str,
-    _max_depth: usize,
+    start_id: &str,
+    edges_json: &str,
+    edge_kinds: Vec<String>,
+    direction: &str,
+    max_depth: usize,
 ) -> PyResult<String> {
-    // Placeholder — will implement fast graph traversal.
-    Ok("[]".to_string())
+    let edges: Vec<graph::EdgeData> = serde_json::from_str(edges_json)
+        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
+    let ids = graph::bfs(&start_id, &edges, &edge_kinds, direction, max_depth);
+    serde_json::to_string(&ids)
+        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))
 }
 
 #[pymodule]
