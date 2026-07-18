@@ -7,9 +7,11 @@ import tree_sitter_cpp
 from codegraph.models import Node, Edge, stable_id, random_id
 from codegraph.parsers.base import (
     make_file_node, node_text, contains_edge,
-    imports_edge, calls_edge, inherits_edge, external_node,
+    imports_edge, calls_edge, inherits_edge, references_edge, external_node,
 )
-from codegraph.parsers.c_parser import _function_name, _declarator_name, _handle_include, _handle_call
+from codegraph.parsers.c_parser import (
+    _function_name, _declarator_name, _handle_include, _handle_call,
+)
 
 _LANGUAGE = Language(tree_sitter_cpp.language())
 _PARSER = Parser(_LANGUAGE)
@@ -59,12 +61,11 @@ def _walk(
             nodes.append(n)
             edges.append(contains_edge(parent, n, file_path, ts_node))
             _handle_base_classes(ts_node, n, file_path, nodes, edges, source)
-            # Walk class body with this class as context
             body = ts_node.child_by_field_name("body")
             if body:
                 for child in body.named_children:
                     _walk(child, n, file_path, nodes, edges, source, class_context=n)
-            return
+        return
 
     elif ts_node.type == "struct_specifier":
         name_node = ts_node.child_by_field_name("name")
@@ -83,7 +84,7 @@ def _walk(
             )
             nodes.append(n)
             edges.append(contains_edge(parent, n, file_path, ts_node))
-            return
+        return
 
     elif ts_node.type == "function_definition":
         name = _function_name(ts_node, source)
@@ -105,7 +106,6 @@ def _walk(
             current = n
 
     elif ts_node.type == "field_declaration":
-        # Method declaration (pure virtual or declared-not-defined) vs plain data member
         fn_decl = _find_function_declarator(ts_node)
         if fn_decl and class_context:
             name = _declarator_name(fn_decl, source)
@@ -124,10 +124,9 @@ def _walk(
                 )
                 nodes.append(n)
                 edges.append(contains_edge(parent, n, file_path, ts_node))
-        return  # don't recurse into field declarations
+        return
 
     elif ts_node.type == "template_declaration":
-        # Walk into the template body, keeping the same context
         for child in ts_node.named_children:
             _walk(child, current, file_path, nodes, edges, source, class_context)
         return
@@ -137,14 +136,28 @@ def _walk(
         return
 
     elif ts_node.type == "call_expression":
-        _handle_call(ts_node, current, file_path, edges, source)
+        _handle_call(ts_node, current, file_path, nodes, edges, source)
+        return
+
+    elif ts_node.type == "type_identifier":
+        type_name = node_text(ts_node, source)
+        type_id = stable_id(f"type:cpp:{type_name}")
+        nodes.append(external_node(type_name, "cpp", "type"))
+        edges.append(references_edge(current.id, type_id, file_path, ts_node))
+        return
+
+    elif ts_node.type == "qualified_identifier":
+        type_name = node_text(ts_node, source)
+        type_id = stable_id(f"type:cpp:{type_name}")
+        nodes.append(external_node(type_name, "cpp", "type"))
+        edges.append(references_edge(current.id, type_id, file_path, ts_node))
+        return
 
     for child in ts_node.named_children:
         _walk(child, current, file_path, nodes, edges, source, class_context)
 
 
 def _find_function_declarator(ts_node: TSNode) -> TSNode | None:
-    """Return the function_declarator child of a field_declaration, if any."""
     for child in ts_node.named_children:
         if child.type == "function_declarator":
             return child
@@ -159,7 +172,6 @@ def _handle_base_classes(
     class_node: TSNode, child: Node, file_path: str,
     nodes: list[Node], edges: list[Edge], source: bytes,
 ) -> None:
-    """Extract inheritance edges from base_class_clause."""
     base_clause = None
     for c in class_node.named_children:
         if c.type == "base_class_clause":

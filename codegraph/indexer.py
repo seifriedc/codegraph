@@ -31,16 +31,18 @@ class Indexer:
         return count
 
     def _parse_file(self, path: Path, language: str) -> tuple[list[Node], list[Edge]]:
-        import json
-        from codegraph.codegraph_core import parse_file as rust_parse_file
+        from codegraph.parsers import ada_parser, c_parser, cpp_parser
 
-        nodes_json, edges_json = rust_parse_file(str(path), language)
-        raw_nodes = json.loads(nodes_json)
-        raw_edges = json.loads(edges_json)
-
-        nodes = [Node(**n) for n in raw_nodes]
-        edges = [Edge(**e) for e in raw_edges]
-        return nodes, edges
+        dispatch = {
+            "ada": ada_parser.parse,
+            "c": c_parser.parse,
+            "cpp": cpp_parser.parse,
+        }
+        parser_fn = dispatch.get(language)
+        if parser_fn is None:
+            from codegraph.parsers.base import make_file_node
+            return [make_file_node(path, language)], []
+        return parser_fn(path)
 
     # ── Mutation API ──────────────────────────────────────────────────────────
 

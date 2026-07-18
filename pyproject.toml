@@ -1,6 +1,6 @@
 [build-system]
-requires = ["maturin>=1.7,<2.0"]
-build-backend = "maturin"
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "codegraph"
@@ -24,13 +24,9 @@ dev = [
 [project.scripts]
 codegraph = "codegraph.cli:app"
 
-# Rust extension (codegraph_core) — built separately with `maturin develop`
-# once Rust is installed. See codegraph_core/ for the Cargo project.
-[tool.maturin]
-python-source = "."
-module-name = "codegraph.codegraph_core"
-manifest-path = "codegraph_core/Cargo.toml"
-features = ["pyo3/extension-module"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["codegraph*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
