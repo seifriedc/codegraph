@@ -66,8 +66,8 @@ def query_files(
 
     if not compiled:
         if compile_errors:
-            msgs = "; ".join(f"{lang}: {msg}" for lang, msg in compile_errors.items())
-            raise ValueError(f"Pattern rejected by all targeted languages — {msgs}")
+            lines = "\n".join(f"  {lang}: {msg}" for lang, msg in compile_errors.items())
+            raise ValueError(f"Pattern rejected by all targeted languages:\n{lines}")
         return
 
     for path in files:
