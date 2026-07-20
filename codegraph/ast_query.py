@@ -52,18 +52,22 @@ def query_files(
 
     registry = _get_registry()
 
-    # Compile pattern per language; silently skip languages where it's invalid.
     compiled: dict[str, Query] = {}
+    compile_errors: dict[str, str] = {}
     for lang_name, (lang_obj, _) in registry.items():
         if language and lang_name != language:
             continue
         try:
             compiled[lang_name] = Query(lang_obj, pattern)
         except QueryError as exc:
+            compile_errors[lang_name] = str(exc)
             if verbose:
                 print(f"[skip {lang_name}: {exc}]", file=sys.stderr)
 
     if not compiled:
+        if compile_errors:
+            msgs = "; ".join(f"{lang}: {msg}" for lang, msg in compile_errors.items())
+            raise ValueError(f"Pattern rejected by all targeted languages — {msgs}")
         return
 
     for path in files:
@@ -146,6 +150,30 @@ def _dump_node(node, depth: int, named_only: bool, out: list[str]) -> None:
             _dump_node(child, depth + 1, named_only, out)
 
 
+def _read_pattern() -> str | None:
+    """Read one S-expression pattern, spanning multiple lines if parens are unbalanced."""
+    try:
+        buf = input("> ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return None
+
+    # A meta-command or empty input — return immediately without reading more lines.
+    if not buf or buf.startswith(":"):
+        return buf
+
+    while buf.count("(") > buf.count(")"):
+        try:
+            cont = input("... ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            break
+        if cont:
+            buf += " " + cont
+
+    return buf
+
+
 def run_repl(
     files: list[Path],
     language: str | None = None,
@@ -165,17 +193,15 @@ def run_repl(
     json_mode = False
 
     while True:
-        try:
-            line = input("> ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print()
+        pattern = _read_pattern()
+        if pattern is None:
             break
 
-        if not line:
+        if not pattern:
             continue
 
-        if line.startswith(":"):
-            parts = line[1:].split()
+        if pattern.startswith(":"):
+            parts = pattern[1:].split()
             cmd = parts[0].lower()
             if cmd in ("quit", "q", "exit"):
                 break
@@ -199,7 +225,7 @@ def run_repl(
                 print(f"Unknown command :{cmd}  (try :help)")
         else:
             try:
-                matches = list(query_files(line, files, language=lang_filter, verbose=verbose))
+                matches = list(query_files(pattern, files, language=lang_filter, verbose=verbose))
                 if json_mode:
                     import json
                     print(json.dumps([_match_to_dict(m) for m in matches], indent=2))
@@ -208,7 +234,7 @@ def run_repl(
                         print(format_match(m))
                 count = len(matches)
                 print(f"({count} match{'es' if count != 1 else ''})")
-            except QueryError as exc:
+            except (QueryError, ValueError) as exc:
                 print(f"Query error: {exc}")
 
 
