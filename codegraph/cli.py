@@ -222,7 +222,11 @@ def ast_query_cmd(
         typer.echo("No source files found.", err=True)
         raise typer.Exit(1)
 
-    matches = list(query_files(pattern, files, language=language, verbose=verbose))
+    try:
+        matches = list(query_files(pattern, files, language=language, verbose=verbose))
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1)
 
     if json_output:
         typer.echo(json.dumps([_match_to_dict(m) for m in matches], indent=2, default=str))

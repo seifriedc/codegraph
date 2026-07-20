@@ -105,6 +105,15 @@ class TestQueryFiles:
         assert C_FILE in files_hit
         assert ADA_FILE not in files_hit
 
+    def test_all_languages_reject_pattern_raises(self):
+        # Unknown node type rejected by all grammars → ValueError, not silent 0 matches
+        with pytest.raises(ValueError, match="rejected by all targeted languages"):
+            list(query_files("(defining_identifier) @x", [ADA_FILE, C_FILE, CPP_FILE]))
+
+    def test_single_language_rejects_pattern_raises(self):
+        with pytest.raises(ValueError, match="rejected by all targeted languages"):
+            list(query_files("(defining_identifier) @x", [ADA_FILE], language="ada"))
+
     def test_no_matches_returns_empty(self):
         matches = list(query_files("(subprogram_body) @fn", [C_FILE]))
         assert matches == []
@@ -201,3 +210,49 @@ class TestCliQuery:
             "ast", "query", "(subprogram_body) @fn", str(tmp_path),
         ])
         assert result.exit_code == 1
+
+    def test_unknown_node_type_exits_nonzero(self):
+        result = runner.invoke(app, [
+            "ast", "query", "(defining_identifier) @x", str(FIXTURES),
+        ])
+        assert result.exit_code == 1
+        assert "rejected" in result.output.lower() or "error" in result.output.lower()
+
+
+# ---------------------------------------------------------------------------
+# _read_pattern multi-line continuation
+# ---------------------------------------------------------------------------
+
+
+class TestReadPattern:
+    def test_single_line_balanced(self):
+        from codegraph.ast_query import _read_pattern
+        from unittest.mock import patch
+        with patch("builtins.input", return_value="(subprogram_body) @fn"):
+            result = _read_pattern()
+        assert result == "(subprogram_body) @fn"
+
+    def test_multiline_unbalanced_accumulates(self):
+        from codegraph.ast_query import _read_pattern
+        from unittest.mock import patch
+        inputs = iter([
+            "(subprogram_body",
+            "(function_specification) @spec) @fn",
+        ])
+        with patch("builtins.input", side_effect=inputs):
+            result = _read_pattern()
+        assert result == "(subprogram_body (function_specification) @spec) @fn"
+
+    def test_meta_command_not_continued(self):
+        from codegraph.ast_query import _read_pattern
+        from unittest.mock import patch
+        with patch("builtins.input", return_value=":help"):
+            result = _read_pattern()
+        assert result == ":help"
+
+    def test_eof_returns_none(self):
+        from codegraph.ast_query import _read_pattern
+        from unittest.mock import patch
+        with patch("builtins.input", side_effect=EOFError):
+            result = _read_pattern()
+        assert result is None
