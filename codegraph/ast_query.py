@@ -151,7 +151,18 @@ def _dump_node(node, depth: int, named_only: bool, out: list[str]) -> None:
 
 
 def _read_pattern() -> str | None:
-    """Read one S-expression pattern, spanning multiple lines if parens are unbalanced."""
+    """Read one S-expression pattern, spanning multiple lines if parens are unbalanced.
+
+    Multi-line patterns are consolidated into a single readline history entry so
+    that pressing up-arrow replays the whole pattern, not individual lines.
+    """
+    try:
+        import readline as _rl
+        history_start = _rl.get_current_history_length()
+    except ImportError:
+        _rl = None  # type: ignore[assignment]
+        history_start = 0
+
     try:
         buf = input("> ").strip()
     except (EOFError, KeyboardInterrupt):
@@ -170,6 +181,13 @@ def _read_pattern() -> str | None:
             break
         if cont:
             buf += " " + cont
+
+    if _rl is not None:
+        # Replace the individually-added lines with the assembled pattern as one entry.
+        current_len = _rl.get_current_history_length()
+        for i in range(current_len - 1, history_start - 1, -1):
+            _rl.remove_history_item(i)
+        _rl.add_history(buf)
 
     return buf
 
