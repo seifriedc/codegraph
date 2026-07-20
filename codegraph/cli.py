@@ -8,8 +8,10 @@ import typer
 app = typer.Typer(help="codegraph — source code knowledge graph tool", no_args_is_help=True)
 query_app = typer.Typer(help="Query the knowledge graph", no_args_is_help=True)
 graph_app = typer.Typer(help="Mutate the knowledge graph", no_args_is_help=True)
+ast_app = typer.Typer(help="Query and inspect ASTs directly", no_args_is_help=True)
 app.add_typer(query_app, name="query")
 app.add_typer(graph_app, name="graph")
+app.add_typer(ast_app, name="ast")
 
 _DB_OPTION = typer.Option(Path(".codegraph.db"), "--db", help="Path to .duckdb file")
 
@@ -182,3 +184,68 @@ def graph_add_edge(
                        file_path=file_path, line=line, col=col)
     idx.close()
     typer.echo(eid)
+
+
+_LANG_OPTION = typer.Option(None, "--language", "-l", help="Restrict to language: ada, c, cpp")
+_PATH_ARG_OPT = typer.Argument(None, help="Source directory to search (default: use --db)")
+
+
+@ast_app.command("dump")
+def ast_dump(
+    file: Path = typer.Argument(..., help="Source file to dump"),
+    named_only: bool = typer.Option(False, "--named-only", help="Show only named nodes"),
+) -> None:
+    """Dump the raw AST of a source file to stdout."""
+    from codegraph.ast_query import dump_ast
+
+    try:
+        typer.echo(dump_ast(file, named_only=named_only))
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1)
+
+
+@ast_app.command("query")
+def ast_query_cmd(
+    pattern: str = typer.Argument(..., help="S-expression pattern with at least one @capture"),
+    path: Optional[Path] = _PATH_ARG_OPT,
+    db: Path = _DB_OPTION,
+    language: Optional[str] = _LANG_OPTION,
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Warn when pattern is skipped for a language"),
+) -> None:
+    """Run a tree-sitter S-expression pattern across source files."""
+    from codegraph.ast_query import query_files, resolve_files, format_match, _match_to_dict
+
+    files = resolve_files(path, db if db.exists() else None)
+    if not files:
+        typer.echo("No source files found.", err=True)
+        raise typer.Exit(1)
+
+    matches = list(query_files(pattern, files, language=language, verbose=verbose))
+
+    if json_output:
+        typer.echo(json.dumps([_match_to_dict(m) for m in matches], indent=2, default=str))
+    else:
+        for m in matches:
+            typer.echo(format_match(m))
+        count = len(matches)
+        typer.echo(f"({count} match{'es' if count != 1 else ''})", err=True)
+
+
+@ast_app.command("shell")
+def ast_shell_cmd(
+    path: Optional[Path] = _PATH_ARG_OPT,
+    db: Path = _DB_OPTION,
+    language: Optional[str] = _LANG_OPTION,
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
+) -> None:
+    """Interactive REPL for querying ASTs with S-expression patterns."""
+    from codegraph.ast_query import resolve_files, run_repl
+
+    files = resolve_files(path, db if db.exists() else None)
+    if not files:
+        typer.echo("No source files found.", err=True)
+        raise typer.Exit(1)
+
+    run_repl(files, language=language, verbose=verbose)
