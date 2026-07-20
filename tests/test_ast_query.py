@@ -256,3 +256,23 @@ class TestReadPattern:
         with patch("builtins.input", side_effect=EOFError):
             result = _read_pattern()
         assert result is None
+
+    def test_multiline_consolidated_in_readline_history(self):
+        from codegraph.ast_query import _read_pattern
+        from unittest.mock import patch, MagicMock
+
+        fake_rl = MagicMock()
+        fake_rl.get_current_history_length.side_effect = [2, 4]  # before=2, after=4 (2 lines added)
+        inputs = iter(["(subprogram_body", "(identifier) @name) @fn"])
+
+        with patch("builtins.input", side_effect=inputs), \
+             patch.dict("sys.modules", {"readline": fake_rl}):
+            # Re-import so the patched readline is picked up inside _read_pattern
+            import importlib, codegraph.ast_query as m
+            importlib.reload(m)
+            result = m._read_pattern()
+
+        assert result == "(subprogram_body (identifier) @name) @fn"
+        # Two lines were added (indices 2 and 3); both should be removed then re-added as one.
+        assert fake_rl.remove_history_item.call_count == 2
+        fake_rl.add_history.assert_called_once_with(result)
