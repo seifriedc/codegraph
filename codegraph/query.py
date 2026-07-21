@@ -1,10 +1,45 @@
 from __future__ import annotations
+import concurrent.futures
+import re
 from pathlib import Path
 from typing import Any
 
 import duckdb
 
 from codegraph.db import connect
+
+# Comment syntax per language, used for the SLOC heuristic in Graph.demographics().
+# Approximate: doesn't special-case comment markers inside string literals.
+_LINE_COMMENT = {"ada": "--", "c": "//", "cpp": "//"}
+_BLOCK_COMMENT_RE = {
+    lang: re.compile(re.escape(start) + r".*?" + re.escape(end), re.DOTALL)
+    for lang, (start, end) in {"c": ("/*", "*/"), "cpp": ("/*", "*/")}.items()
+}
+
+
+def _count_loc_sloc(file_path: str | None, language: str | None) -> tuple[int, int] | None:
+    """Return (total lines, source lines of code) for a file, or None if unreadable."""
+    if not file_path:
+        return None
+    try:
+        text = Path(file_path).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+
+    total = len(text.splitlines())
+
+    block_re = _BLOCK_COMMENT_RE.get(language)
+    stripped = block_re.sub("", text) if block_re else text
+    line_comment = _LINE_COMMENT.get(language)
+
+    sloc = 0
+    for line in stripped.splitlines():
+        code = line.strip()
+        if line_comment:
+            code = code.split(line_comment, 1)[0].strip()
+        if code:
+            sloc += 1
+    return total, sloc
 
 
 class Graph:
@@ -130,6 +165,63 @@ class Graph:
         return {
             "ancestors": self.transitive(node_id, "inherits", direction="out"),
             "descendants": self.transitive(node_id, "inherits", direction="in"),
+        }
+
+    def demographics(self) -> dict:
+        """Summary of the indexed codebase: node/edge/LOC counts broken down by language and kind."""
+        nodes_by_language = {
+            row["language"]: row["count"]
+            for row in self._fetchall(
+                "SELECT language, COUNT(*) AS count FROM nodes GROUP BY language ORDER BY language"
+            )
+        }
+        nodes_by_kind = {
+            row["kind"]: row["count"]
+            for row in self._fetchall(
+                "SELECT kind, COUNT(*) AS count FROM nodes GROUP BY kind ORDER BY kind"
+            )
+        }
+        edges_by_kind = {
+            row["kind"]: row["count"]
+            for row in self._fetchall(
+                "SELECT kind, COUNT(*) AS count FROM edges GROUP BY kind ORDER BY kind"
+            )
+        }
+
+        by_language: dict[str, dict] = {}
+
+        def lang_entry(language: str) -> dict:
+            return by_language.setdefault(
+                language, {"nodes_by_kind": {}, "files": 0, "lines": 0, "sloc": 0}
+            )
+
+        for row in self._fetchall(
+            "SELECT language, kind, COUNT(*) AS count FROM nodes GROUP BY language, kind ORDER BY language, kind"
+        ):
+            lang_entry(row["language"])["nodes_by_kind"][row["kind"]] = row["count"]
+
+        file_rows = self._fetchall("SELECT language, file_path FROM nodes WHERE kind = 'file'")
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            counts = pool.map(lambda r: _count_loc_sloc(r["file_path"], r["language"]), file_rows)
+
+        for row, count in zip(file_rows, counts):
+            entry = lang_entry(row["language"])
+            entry["files"] += 1
+            if count is not None:
+                lines, sloc = count
+                entry["lines"] += lines
+                entry["sloc"] += sloc
+
+        return {
+            "total_nodes": sum(nodes_by_language.values()),
+            "total_edges": sum(edges_by_kind.values()),
+            "total_files": sum(entry["files"] for entry in by_language.values()),
+            "total_lines": sum(entry["lines"] for entry in by_language.values()),
+            "total_sloc": sum(entry["sloc"] for entry in by_language.values()),
+            "nodes_by_language": nodes_by_language,
+            "nodes_by_kind": nodes_by_kind,
+            "edges_by_kind": edges_by_kind,
+            "by_language": by_language,
         }
 
     def callers(self, node_id: str) -> list[dict]:
