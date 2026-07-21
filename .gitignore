@@ -8,16 +8,9 @@ dist/
 build/
 .pytest_cache/
 
-# Rust
-target/
-
 # DuckDB databases (generated at runtime)
 *.duckdb
 *.duckdb.wal
-
-# maturin
-*.so
-*.pyd
 
 # macOS
 .DS_Store
