@@ -143,6 +143,40 @@ def query_callers(
     typer.echo(json.dumps(rows, indent=2, default=str))
 
 
+@query_app.command("demographics")
+def query_demographics(
+    db: Path = _DB_OPTION,
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+) -> None:
+    """Report codebase composition: node/edge/LOC breakdown by language and kind."""
+    from codegraph.query import Graph
+
+    g = Graph(db)
+    report = g.demographics()
+
+    if json_output:
+        typer.echo(json.dumps(report, indent=2, default=str))
+        return
+
+    typer.echo(f"Codebase demographics — {db}")
+    typer.echo("=" * 40)
+    typer.echo(f"Files: {report['total_files']}   Nodes: {report['total_nodes']}   Edges: {report['total_edges']}")
+    typer.echo(f"Lines: {report['total_lines']}   SLOC: {report['total_sloc']}")
+
+    typer.echo("\nBy language:")
+    for language, entry in sorted(report["by_language"].items(), key=lambda kv: (kv[0] is None, kv[0])):
+        label = language or "(unknown)"
+        typer.echo(f"  {label:<10} {entry['files']:>5} files   {entry['lines']:>7} lines   {entry['sloc']:>7} sloc")
+
+    typer.echo("\nNodes by kind:")
+    for kind, count in report["nodes_by_kind"].items():
+        typer.echo(f"  {kind:<12} {count}")
+
+    typer.echo("\nEdges by kind:")
+    for kind, count in report["edges_by_kind"].items():
+        typer.echo(f"  {kind:<12} {count}")
+
+
 @graph_app.command("add-node")
 def graph_add_node(
     db: Path = _DB_OPTION,

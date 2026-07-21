@@ -94,6 +94,34 @@ def test_mutation_add_edge(tmp_path):
     assert any(e["id"] == eid for e in edges)
 
 
+def test_demographics_counts(cpp_graph):
+    report = cpp_graph.demographics()
+    assert report["total_files"] == 1
+    assert report["total_nodes"] > 0
+    assert sum(report["nodes_by_language"].values()) == report["total_nodes"]
+    assert report["nodes_by_language"]["cpp"] > 0
+    assert "cpp" in report["by_language"]
+    assert report["by_language"]["cpp"]["files"] == 1
+    assert report["total_lines"] > 0
+    assert report["total_sloc"] > 0
+    assert report["total_sloc"] <= report["total_lines"]
+
+
+def test_demographics_multi_language(tmp_path):
+    db = tmp_path / "multi.duckdb"
+    idx = Indexer(db)
+    idx.index(FIXTURES / "ada")
+    idx.index(FIXTURES / "c")
+    idx.close()
+
+    report = Graph(db).demographics()
+    assert set(report["by_language"]) == {"ada", "c"}
+    assert report["by_language"]["ada"]["files"] == 3
+    assert report["by_language"]["c"]["files"] == 1
+    assert report["total_files"] == 4
+    assert report["edges_by_kind"]  # non-empty
+
+
 def test_update_node_metadata(tmp_path):
     db = tmp_path / "mut.duckdb"
     idx = Indexer(db)
