@@ -1,0 +1,129 @@
+<!doctype html>
+<!-- PROTOTYPE (throwaway): graph exploration layouts over tests/fixtures. Question: how should exploring feel?
+     Variants via ?variant=: A focus+expand (force) | B focus+expand (concentric rings) | C impact (layered LR)
+     | D hierarchy (layered TB) | E overview (dir-tree compound) | F overview (package graph). Run: python -m http.server here. -->
+<html><head><meta charset="utf-8"><title>PROTOTYPE graph-viz</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.2/cytoscape.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dagre@0.8.5/dist/dagre.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
+<script src="data.js"></script>
+<style>
+body{margin:0;font:13px system-ui;display:flex;height:100vh;background:#fafafa;color:#222}
+#side{width:270px;padding:10px;border-right:1px solid #ccc;overflow:auto;background:#fff}
+#cy{flex:1}
+#bar{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);background:#111;color:#fff;border-radius:20px;padding:6px 14px;display:flex;gap:12px;align-items:center;box-shadow:0 2px 10px #0006}
+#bar button{background:none;border:0;color:#fff;font-size:18px;cursor:pointer}
+.k{display:inline-block;padding:0 5px;border-radius:3px;background:#eee;margin-right:4px;font-size:11px}
+input,select{width:100%;margin:4px 0;box-sizing:border-box}
+li{cursor:pointer;margin:2px 0;list-style:none}
+ul{padding:0}
+.legend span{display:inline-block;margin-right:8px}
+</style></head><body>
+<div id="side">
+ <b>Focus node</b><input id="q" placeholder="search name…" list="names"><datalist id="names"></datalist>
+ <label>depth <select id="depth"><option>1</option><option selected>2</option><option>3</option><option>5</option></select></label>
+ <label>edges <select id="ek"><option value="all">all</option><option>calls</option><option>inherits</option><option>references</option><option>imports</option><option>contains</option></select></label>
+ <label id="dirw">direction <select id="dir"><option value="both">both</option><option value="out">callees (out)</option><option value="in">callers (in)</option></select></label>
+ <div id="info" style="margin-top:8px"></div>
+ <p style="color:#666">Click node = refocus (A/B/C/D) · double-click = expand neighbours in place (A/B) · overview: click package to drill down.</p>
+ <div class="legend" id="legend"></div>
+</div>
+<div id="cy"></div>
+<div id="bar"><button id="prev">‹</button><span id="vlabel"></span><button id="next">›</button></div>
+<script>
+cytoscape.use(cytoscapeDagre);
+const G=window.GRAPH, byId={}; G.nodes.forEach(n=>byId[n.id]=n);
+const rel=p=>p?p.replace(/.*tests\/fixtures\//,''):null;
+const COL={function:'#4c8bf5',method:'#7aa8f7',class:'#e8710a',type:'#f2a65a',package:'#0f9d58',module:'#9aa0a6',file:'#bbb',field:'#d7b'};
+const EC={calls:'#d33',inherits:'#80b',imports:'#888',contains:'#cfcfcf',references:'#9bd'};
+const VARS=[['A','Focus: force + expand'],['B','Focus: rings + expand'],['C','Impact: layered LR'],['D','Hierarchy: layered TB'],['E','Overview: directory tree'],['F','Overview: package graph']];
+const P=new URLSearchParams(location.search);let vi=Math.max(0,VARS.findIndex(v=>v[0]==P.get('variant')));
+let focus=P.get('focus')||G.nodes.find(n=>n.qualified_name=='Shape'&&n.kind=='class')?.id||G.nodes[0].id;
+const adjOut={},adjIn={};G.edges.forEach(e=>{(adjOut[e.source_id]??=[]).push(e);(adjIn[e.target_id]??=[]).push(e)});
+const nm=n=>n.qualified_name||n.name;
+document.getElementById('names').innerHTML=G.nodes.filter(n=>n.kind!='file'&&n.kind!='field').map(n=>`<option value="${nm(n)}">${n.kind}`).join('');
+const cy=cytoscape({container:document.getElementById('cy'),wheelSensitivity:.3,
+ style:[{selector:'node',style:{label:'data(label)','font-size':10,'background-color':'data(color)','text-valign':'bottom','text-margin-y':3,width:18,height:18}},
+ {selector:'node.focus',style:{'border-width':3,'border-color':'#000',width:26,height:26}},
+ {selector:'node:parent',style:{'background-opacity':.08,'border-width':1,'border-color':'#999',shape:'round-rectangle','text-valign':'top',label:'data(label)','font-size':11,padding:12}},
+ {selector:'edge',style:{width:'data(w)','line-color':'data(color)','target-arrow-color':'data(color)','target-arrow-shape':'triangle','curve-style':'bezier','arrow-scale':.8,label:'data(label)','font-size':8,color:'#666'}},
+ {selector:'edge[kind="contains"]',style:{'line-style':'dotted'}}]});
+const nd=n=>({data:{id:n.id,label:nm(n)+(n.kind=='method'||n.kind=='function'?'()':''),color:COL[n.kind]||'#999',kind:n.kind}});
+const ed=(e,i)=>({data:{id:'e'+i,source:e.source_id,target:e.target_id,kind:e.kind,color:EC[e.kind]||'#999',w:e.kind=='contains'?1:2,label:e.kind=='contains'?'':e.kind}});
+const eIdx=new Map(G.edges.map((e,i)=>[e,i]));
+function neighborhood(start,depth,kinds,dir){ // BFS
+  const seen=new Map([[start,0]]),es=new Set(),q=[start];
+  while(q.length){const u=q.shift(),d=seen.get(u);if(d>=depth)continue;
+    const cand=[...(dir!='in'?adjOut[u]||[]:[]),...(dir!='out'?adjIn[u]||[]:[])];
+    for(const e of cand){if(kinds!='all'&&e.kind!=kinds)continue;es.add(e);const v=e.source_id==u?e.target_id:e.source_id;
+      if(!seen.has(v)){seen.set(v,d+1);q.push(v)}}}
+  return{seen,es};}
+function show(){
+  const v=VARS[vi][0],depth=+depth_.value,kinds=ek.value;let dir=dir_.value;
+  cy.elements().remove();
+  if(v=='E'||v=='F'){overview(v);}else{
+    if(v=='C'&&dir=='both'&&!window._dirSet){dir_.value=dir='in'}
+    if(v=='D'){kindsH();return}
+    const{seen,es}=neighborhood(focus,depth,v=='C'&&kinds=='all'?'calls':kinds,dir);
+    cy.add([...seen.keys()].map(id=>nd(byId[id])));cy.add([...es].map(e=>ed(e,eIdx.get(e))));
+    cy.$id(focus).addClass('focus');layout(v);}
+  info();legend();}
+function layout(v,anim=true){
+  const o={animate:anim,padding:30};
+  if(v=='A')cy.layout({name:'cose',...o,nodeRepulsion:()=>9000,idealEdgeLength:()=>70}).run();
+  else if(v=='B')cy.layout({name:'concentric',...o,concentric:n=>n.id()==focus?10:10-(n.data('d')||1),levelWidth:()=>1,minNodeSpacing:30}).run();
+  else cy.layout({name:'dagre',rankDir:v=='C'?'LR':'TB',...o,nodeSep:25,rankSep:60}).run();}
+function kindsH(){ // type-hierarchy (inherits) around focus, plus declaration contains for D
+  const n=byId[focus];const{seen,es}=neighborhood(focus,6,'inherits','both');
+  let ids=new Set(seen.keys());if(ids.size==1){ // nothing inherits: show declaration hierarchy (contains)
+    const r=neighborhood(focus,3,'contains','both');r.seen.forEach((_,k)=>ids.add(k));r.es.forEach(e=>es.add(e));}
+  cy.add([...ids].map(id=>nd(byId[id])));cy.add([...es].map(e=>ed(e,eIdx.get(e))));
+  cy.$id(focus).addClass('focus');layout('D');info();legend();}
+function overview(v){
+  const files=G.nodes.filter(n=>n.kind=='file');
+  if(v=='E'){ // directory-tree compound: dir > file > symbols(contains)
+    const dirs=new Set(),els=[];
+    files.forEach(f=>{const p=rel(f.file_path).split('/');dirs.add(p[0]);});
+    dirs.forEach(d=>els.push({data:{id:'dir:'+d,label:d+'/',color:'#ccc'}}));
+    files.forEach(f=>els.push({data:{id:f.id,label:rel(f.file_path).split('/')[1],color:'#bbb',parent:'dir:'+rel(f.file_path).split('/')[0]}}));
+    const owner={};G.edges.filter(e=>e.kind=='contains'&&byId[e.source_id].kind=='file').forEach(e=>owner[e.target_id]=e.source_id);
+    G.nodes.filter(n=>owner[n.id]&&!['field','method'].includes(n.kind)).forEach(n=>els.push({data:{...nd(n).data,parent:owner[n.id]}}));
+    cy.add(els);const have=new Set(cy.nodes().map(n=>n.id()));const agg={};
+    G.edges.filter(e=>['calls','inherits'].includes(e.kind)).forEach(e=>{const s=ownerOf(e.source_id,owner),t=ownerOf(e.target_id,owner);
+      if(have.has(s)&&have.has(t)&&s!=t){const k=s+'|'+t+'|'+e.kind;agg[k]=(agg[k]||0)+1}});
+    cy.add(Object.entries(agg).map(([k,c],i)=>{const[s,t,kind]=k.split('|');return{data:{id:'a'+i,source:s,target:t,kind,color:EC[kind],w:1+c,label:kind+' ×'+c}}}));
+    cy.layout({name:'dagre',rankDir:'LR',padding:30,animate:false}).run();
+  } else { // package graph: packages/namespaces/classes as nodes, edges aggregated across members
+    const pk=n=>{ // package-ish owner per language
+      if(n.language=='ada')return n.kind=='package'?n.qualified_name:n.qualified_name.split('.').slice(0,-1).join('.')||null;
+      if(n.language=='cpp')return 'cpp:'+(rel(n.file_path)||'external');
+      if(n.language=='c')return 'c:'+(rel(n.file_path)||'external');return null;};
+    const grp=n=>{const g=pk(n);return g?(n.file_path||n.kind=='package'||true?g:null):null};
+    const ids={};G.nodes.forEach(n=>{if(['file','module'].includes(n.kind))return;const g=grp(n);if(g)ids[n.id]=g});
+    const names=[...new Set(Object.values(ids))];
+    cy.add(names.map(g=>({data:{id:'p:'+g,label:g.replace(/^(c|cpp):/,''),color:g.startsWith('c')?'#e8710a':'#0f9d58'}})));
+    const agg={};G.edges.forEach(e=>{if(!['calls','inherits','imports','references'].includes(e.kind))return;const s=ids[e.source_id],t=ids[e.target_id];
+      if(s&&t&&s!=t){const k=s+'|'+t;(agg[k]??={})[e.kind]=(agg[k][e.kind]||0)+1}});
+    cy.add(Object.entries(agg).map(([k,m],i)=>{const[s,t]=k.split('|'),c=Object.values(m).reduce((a,b)=>a+b);return{data:{id:'a'+i,source:'p:'+s,target:'p:'+t,kind:'calls',color:'#888',w:1+c/2,label:Object.entries(m).map(([a,b])=>a+'×'+b).join(' ')}}}));
+    cy.nodes().forEach(n=>n.style({width:30,height:30}));
+    cy.layout({name:'cose',padding:40,animate:false,idealEdgeLength:()=>130,nodeRepulsion:()=>20000}).run();}
+  document.getElementById('info').innerHTML='<i>Overview: no focus. '+(v=='E'?'Files grouped by directory; cross-file calls/inherits aggregated (counts on edges). Symbols nested inside files.':'Ada packages / C & C++ per-file pseudo-package; edges aggregated by kind with counts.')+'</i>';}
+function ownerOf(id,owner){return owner[id]||id}
+function info(){const n=byId[focus];if(!n)return;document.getElementById('info').innerHTML=`<span class=k>${n.kind}</span><b>${nm(n)}</b><br>${n.language||''} ${rel(n.file_path)||'(external placeholder)'}:${n.line_start||''}<br>${cy.nodes().length} nodes / ${cy.edges().length} edges visible`;}
+function legend(){document.getElementById('legend').innerHTML=Object.entries(COL).map(([k,c])=>`<span><b style="color:${c}">●</b>${k}</span>`).join('')+'<br>'+Object.entries(EC).map(([k,c])=>`<span><b style="color:${c}">―</b>${k}</span>`).join('')}
+function setV(i){vi=(i+VARS.length)%VARS.length;P.set('variant',VARS[vi][0]);history.replaceState(null,'','?'+P);
+  vlabel.textContent=VARS[vi][0]+' ('+VARS[vi][1]+')';show();}
+cy.on('tap','node',e=>{const n=e.target;if(n.isParent()||n.id().startsWith('p:')||n.id().startsWith('dir:'))return;
+  if(['E','F'].includes(VARS[vi][0])){focus=n.id();setV(0);return}focus=n.id();show();});
+cy.on('dbltap','node',e=>{const v=VARS[vi][0];if(!['A','B'].includes(v))return;const id=e.target.id();
+  const{seen,es}=neighborhood(id,1,ek.value,'both');const add=[];
+  seen.forEach((_,k)=>{if(cy.$id(k).empty())add.push(nd(byId[k]))});
+  es.forEach(x=>{const i=eIdx.get(x);if(cy.$id('e'+i).empty()&&!cy.$id(x.source_id).empty()||add.length)add.push(ed(x,i))});
+  const seenE=new Set();cy.add(add.filter(a=>{if(cy.$id(a.data.id).nonempty()||seenE.has(a.data.id))return false;seenE.add(a.data.id);return !a.data.source||(cy.$id(a.data.source).nonempty()||add.some(z=>z.data.id==a.data.source))&&(cy.$id(a.data.target).nonempty()||add.some(z=>z.data.id==a.data.target))}));
+  layout(v);info();});
+q.onchange=()=>{const n=G.nodes.find(n=>nm(n)==q.value);if(n){focus=n.id;show()}};
+[depth_=document.getElementById('depth'),ek=document.getElementById('ek'),dir_=document.getElementById('dir')].forEach(s=>s.onchange=()=>{window._dirSet=true;show()});
+prev.onclick=()=>setV(vi-1);next.onclick=()=>setV(vi+1);
+addEventListener('keydown',e=>{if(/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName))return;if(e.key=='ArrowLeft')setV(vi-1);if(e.key=='ArrowRight')setV(vi+1)});
+setV(vi);
+</script></body></html>
