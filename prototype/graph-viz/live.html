@@ -1,0 +1,186 @@
+<!doctype html>
+<!-- PROTOTYPE v2 (throwaway): live-physics layout spike. Questions: can focus views feel "alive" (Neo4j-style) with stable refocus,
+     stub-node expansion and no manual dragging? Can the overview collapse/expand groups?
+     ?variant= : A d3-force driving Cytoscape (own physics loop) | B cytoscape-cola infinite | C overview w/ collapsible groups (fcose)
+     ?data=synth : ~700-node synthetic graph with hubs (default: tests/fixtures graph). Run: python3 -m http.server here. -->
+<html><head><meta charset="utf-8"><title>PROTOTYPE graph-viz live</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.2/cytoscape.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/webcola@3.4.0/WebCola/cola.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cytoscape-cola@2.5.1/cytoscape-cola.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/layout-base@2.0.1/layout-base.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cose-base@2.2.0/cose-base.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cytoscape-fcose@2.2.0/cytoscape-fcose.js"></script>
+<script src="data.js"></script>
+<style>
+body{margin:0;font:13px system-ui;display:flex;height:100vh;background:#fafafa;color:#222}
+#side{width:270px;padding:10px;border-right:1px solid #ccc;overflow:auto;background:#fff}
+#cy{flex:1}
+#bar{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);background:#111;color:#fff;border-radius:20px;padding:6px 14px;display:flex;gap:12px;align-items:center;box-shadow:0 2px 10px #0006}
+#bar button{background:none;border:0;color:#fff;font-size:18px;cursor:pointer}
+#status{position:fixed;top:8px;right:12px;background:#fffd;padding:4px 8px;border:1px solid #ccc;border-radius:4px}
+input,select{width:100%;margin:4px 0;box-sizing:border-box}
+label.k{display:block}
+</style></head><body>
+<div id="side">
+ <b>Focus node</b><input id="q" placeholder="search name…" list="names"><datalist id="names"></datalist>
+ <label>depth <select id="depth"><option>1</option><option selected>2</option><option>3</option><option>5</option></select></label>
+ <label>direction <select id="dir"><option value="both">both</option><option value="in">impact (in)</option><option value="out">dependencies (out)</option></select></label>
+ <label>fan-out cap <select id="cap"><option>5</option><option selected>15</option><option>50</option></select></label>
+ <div id="info" style="margin:8px 0"></div>
+ <div id="kinds"></div>
+ <p style="color:#666">Click = refocus (existing nodes keep positions). Click stub "+N" = show more. Double-click a group (variant C) = collapse/expand. Drag not needed: physics untangles; "reheat" re-shakes.</p>
+ <button id="reheat">reheat</button> <button id="pin">toggle pin focus</button>
+</div>
+<div id="cy"></div><div id="status"></div>
+<div id="bar"><button id="prev">‹</button><span id="vlabel"></span><button id="next">›</button></div>
+<script>
+// ---------- data ----------
+let G=window.GRAPH;
+const P=new URLSearchParams(location.search);
+if(P.get('data')=='synth'){ // seeded synthetic graph: 12 packages x ~55 funcs, 5 hubs, class hierarchies
+  let seed=7;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
+  const nodes=[],edges=[];const pk=[];
+  for(let p=0;p<12;p++){const id='p'+p;pk.push(id);nodes.push({id,kind:'package',name:'Pkg'+p,qualified_name:'Pkg'+p,file_path:'/r/src/pkg'+p+'/mod.ads',language:p%3?'cpp':'ada'})}
+  const fn=[];
+  for(let p=0;p<12;p++)for(let i=0;i<55;i++){const id=`f${p}_${i}`;fn.push(id);
+    nodes.push({id,kind:i%9==0?'class':'function',name:'fn'+i,qualified_name:`Pkg${p}.fn${i}`,file_path:`/r/src/pkg${p}/mod${i%3}.cpp`,language:p%3?'cpp':'ada'});
+    edges.push({kind:'contains',source_id:'p'+p,target_id:id});}
+  const hubs=fn.slice(0,5).concat(fn.slice(200,203));
+  fn.forEach(s=>{const n=1+Math.floor(rnd()*3);for(let k=0;k<n;k++){const t=rnd()<.25?hubs[Math.floor(rnd()*hubs.length)]:fn[Math.floor(rnd()*fn.length)];if(t!=s)edges.push({kind:'calls',source_id:s,target_id:t})}});
+  for(let i=0;i<fn.length;i+=9)if(i+9<fn.length)edges.push({kind:'inherits',source_id:fn[i+9],target_id:fn[i]});
+  G={nodes,edges};
+}
+const byId={};G.nodes.forEach(n=>byId[n.id]=n);
+const root=(()=>{const fs=G.nodes.filter(n=>n.file_path).map(n=>n.file_path.split('/'));if(!fs.length)return'';let r=fs[0];fs.forEach(f=>{let i=0;while(i<r.length&&i<f.length&&r[i]==f[i])i++;r=r.slice(0,i)});return r.join('/')+'/'})();
+const rel=p=>p?p.replace(root,''):null;
+const adjOut={},adjIn={};G.edges.forEach((e,i)=>{e.i=i;(adjOut[e.source_id]??=[]).push(e);(adjIn[e.target_id]??=[]).push(e)});
+const nm=n=>n.qualified_name||n.name;
+// ---------- encoding (per visual-encoding decision) ----------
+const SHAPE={function:'ellipse',method:'ellipse',class:'round-rectangle',type:'round-rectangle',package:'diamond',module:'rectangle',file:'rectangle',field:'triangle',variable:'triangle'};
+const TINT={function:'#9ec1ff',method:'#c4d9ff',class:'#ffc48a',type:'#ffdcb8',package:'#8fd9ae',module:'#ddd',file:'#e6e6e6',field:'#e8c5e8'};
+const LANG={ada:'#0b7285',cpp:'#c2255c',c:'#e67700'};
+const EK={calls:{c:'#d33',ts:'triangle',ls:'solid'},inherits:{c:'#80b',ts:'triangle-backcurve',ls:'solid'},imports:{c:'#888',ts:'vee',ls:'dashed'},references:{c:'#9bb',ts:'none',ls:'dotted'},instantiates:{c:'#2a8',ts:'diamond',ls:'solid'},contains:{c:'#ddd',ts:'none',ls:'dotted'}};
+const IMPACT=['calls','references','instantiates','inherits'];
+// ---------- cytoscape ----------
+cytoscape.use(cytoscapeCola);cytoscape.use(cytoscapeFcose);
+const cy=cytoscape({container:document.getElementById('cy'),wheelSensitivity:.3,minZoom:.1,maxZoom:3,
+ style:[
+ {selector:'node',style:{label:'data(short)','font-size':11,'min-zoomed-font-size':8,'text-valign':'bottom','text-margin-y':3,'text-max-width':90,'text-wrap':'ellipsis','background-color':'data(tint)',shape:'data(shape)','border-width':2,'border-color':'data(lang)',width:'data(sz)',height:'data(sz)','text-background-color':'#fff','text-background-opacity':.7,'text-background-padding':1}},
+ {selector:'node.ext',style:{'border-style':'dashed'}},
+ {selector:'node.focus',style:{'border-width':4,'border-color':'#000',label:'data(full)','z-index':99}},
+ {selector:'node.stub',style:{shape:'round-rectangle','background-color':'#fff','border-style':'dotted','border-color':'#555',label:'data(short)',width:34,height:20}},
+ {selector:'node.lowzoom',style:{label:''}},{selector:'node.focus.lowzoom, node.hov.lowzoom',style:{label:'data(short)'}},
+ {selector:':parent',style:{'background-opacity':.07,'border-width':1,'border-color':'#999',shape:'round-rectangle','text-valign':'top',label:'data(short)',padding:14,'font-size':12}},
+ {selector:'edge',style:{width:'data(w)','line-color':'data(c)','target-arrow-color':'data(c)','target-arrow-shape':'data(ts)','line-style':'data(ls)','curve-style':'bezier','arrow-scale':.9,opacity:.75}},
+ {selector:'edge.agg',style:{'line-color':'#777','target-arrow-color':'#777','curve-style':'bezier',label:'data(label)','font-size':9,'text-background-color':'#fff','text-background-opacity':.8}}]});
+const mk=n=>({data:{id:n.id,short:nm(n).split(/[.:]/).pop()+(['function','method'].includes(n.kind)?'()':''),full:nm(n),tint:TINT[n.kind]||'#ddd',shape:SHAPE[n.kind]||'ellipse',lang:LANG[n.language]||'#999',sz:['package','class'].includes(n.kind)?26:18,kind:n.kind},classes:n.file_path?'':'ext'});
+const me=e=>({data:{id:'e'+e.i,source:e.source_id,target:e.target_id,kind:e.kind,c:(EK[e.kind]||{}).c||'#999',ts:(EK[e.kind]||{ts:'triangle'}).ts,ls:(EK[e.kind]||{ls:'solid'}).ls,w:e.kind=='contains'?1:2}});
+// ---------- state ----------
+const VARS=[['A','Live: d3-force driving Cytoscape'],['B','Live: cytoscape-cola infinite'],['C','Overview: collapsible groups (fcose)']];
+let vi=Math.max(0,VARS.findIndex(v=>v[0]==P.get('variant')));
+let focus=P.get('focus')||(P.get('data')=='synth'?'f0_0':G.nodes.find(n=>n.qualified_name=='Shape'&&n.kind=='class')?.id)||G.nodes[0].id;
+const shown=new Set(),moreSkip={}; // node ids shown; stub paging offsets
+let pinFocus=true,sim=null,colaL=null;
+const $=id=>document.getElementById(id);
+const activeKinds=new Set(Object.keys(EK).filter(k=>k!='contains'));
+$('kinds').innerHTML=Object.entries(EK).filter(([k])=>k!='contains').map(([k,v])=>`<label class=k><input type=checkbox checked data-k="${k}" style="width:auto"> <b style="color:${v.c}">${v.ls=='solid'?'―':v.ls=='dashed'?'╌':'┈'}▸</b> ${k}</label>`).join('');
+$('kinds').onchange=e=>{e.target.checked?activeKinds.add(e.target.dataset.k):activeKinds.delete(e.target.dataset.k);rebuild()};
+$('names').innerHTML=G.nodes.filter(n=>!['file','field'].includes(n.kind)).slice(0,500).map(n=>`<option value="${nm(n)}">`).join('');
+// ---------- focus-view neighbourhood with fan-out cap + stubs ----------
+function candEdges(u){const d=$('dir').value;let out=adjOut[u]||[],inn=adjIn[u]||[];
+  if(d=='in')out=[];if(d=='out')inn=[];
+  return[...out,...inn].filter(e=>activeKinds.has(e.kind)&&byId[e.source_id]&&byId[e.target_id]);}
+function grow(){ // BFS from focus to depth; cap per node; record stubs
+  const depth=+$('depth').value,cap=+$('cap').value;const want=new Map([[focus,0]]),edges=new Set(),stubs={};
+  const q=[focus];
+  while(q.length){const u=q.shift(),d=want.get(u);if(d>=depth)continue;
+    const c=candEdges(u),fresh=[];
+    for(const e of c){const v=e.source_id==u?e.target_id:e.source_id;if(want.has(v)){edges.add(e);continue}fresh.push([e,v])}
+    const skip=moreSkip[u]||0,take=cap+skip;
+    fresh.slice(0,take).forEach(([e,v])=>{want.set(v,d+1);edges.add(e);q.push(v)});
+    if(fresh.length>take)stubs[u]=fresh.length-take;}
+  // induced edges among wanted nodes
+  want.forEach((_,u)=>candEdges(u).forEach(e=>{if(want.has(e.source_id)&&want.has(e.target_id))edges.add(e)}));
+  return{want,edges,stubs};}
+// ---------- live layout A: d3-force over cytoscape ----------
+function stopLive(){if(sim){sim.stop();sim=null}if(colaL){colaL.stop();colaL=null}}
+function startD3(){
+  const ns=cy.nodes().map(n=>({id:n.id(),x:n.position('x'),y:n.position('y'),fx:null,fy:null}));const ix=Object.fromEntries(ns.map(n=>[n.id,n]));
+  const ls=cy.edges().map(e=>({source:ix[e.data('source')],target:ix[e.data('target')]})).filter(l=>l.source&&l.target);
+  if(pinFocus&&ix[focus]){ix[focus].fx=cy.width()/2;ix[focus].fy=cy.height()/2}
+  sim=d3.forceSimulation(ns).alphaDecay(.012).velocityDecay(.35)
+   .force('link',d3.forceLink(ls).distance(90).strength(.6))
+   .force('charge',d3.forceManyBody().strength(-260).distanceMax(400))
+   .force('collide',d3.forceCollide(34))   // keeps nodes + labels from piling up
+   .force('center',d3.forceCenter(cy.width()/2,cy.height()/2).strength(.03))
+   .on('tick',()=>{cy.batch(()=>ns.forEach(n=>{const c=cy.getElementById(n.id);if(c.nonempty()&&!c.grabbed())c.position({x:n.x,y:n.y})}))});
+  sim.nodesById=ix;}
+function startCola(){colaL=cy.layout({name:'cola',infinite:true,fit:false,animate:true,randomize:false,nodeSpacing:()=>28,edgeLength:90,avoidOverlap:true,handleDisconnected:true,convergenceThreshold:.001,ungrabifyWhileSimulating:false});colaL.run();}
+// ---------- rebuild preserving positions ----------
+function rebuild(){
+  if(VARS[vi][0]=='C'){overview();return}
+  stopLive();cy.elements().remove();
+  const{want,edges,stubs}=grow();
+  const old=window._pos||{};
+  const ents=[];
+  want.forEach((d,id)=>{const o=mk(byId[id]);const p=old[id];if(p)o.position={...p};ents.push(o)});
+  edges.forEach(e=>ents.push(me(e)));
+  Object.entries(stubs).forEach(([u,n])=>{ents.push({data:{id:'stub:'+u,short:'+'+n,full:'+'+n},classes:'stub'});ents.push({data:{id:'se:'+u,source:u,target:'stub:'+u,w:1,c:'#999',ts:'none',ls:'dotted',kind:'stub'}})});
+  cy.add(ents);
+  // new nodes spawn near an existing neighbour (or centre) so the layout doesn't jump
+  cy.nodes().forEach(n=>{if(!n.scratch('placed')&&!old[n.id()]){const nb=n.neighborhood('node').filter(m=>old[m.id()]);const b=nb.nonempty()?old[nb[0].id()]:{x:cy.width()/2,y:cy.height()/2};n.position({x:b.x+(Math.random()-.5)*60,y:b.y+(Math.random()-.5)*60})}n.scratch('placed',1)});
+  cy.$id(focus).addClass('focus');
+  if(pinFocus){const f=cy.$id(focus);const c=old[focus]||{x:cy.width()/2,y:cy.height()/2};f.position(c)}
+  VARS[vi][0]=='A'?startD3():startCola();
+  info(want.size,Object.values(stubs).reduce((a,b)=>a+b,0));zoomLabels();}
+function snapshot(){window._pos={};cy.nodes().forEach(n=>window._pos[n.id()]=n.position())}
+// ---------- overview with collapsible groups ----------
+const collapsed=new Set();
+function groupOf(n){ // package for ada; first dir for others (stand-in for ADR 0001 groups)
+  const r=rel(n.file_path)||'';return n.kind=='package'&&n.language=='ada'?n.id:('dir:'+(r.split('/')[0]||'external'));}
+function overview(){
+  stopLive();snapshot();cy.elements().remove();
+  const kids={};const owner={};
+  G.nodes.forEach(n=>{if(['file','module','field'].includes(n.kind))return;
+    const g=n.kind=='package'?n.id:'dir:'+((rel(n.file_path)||'external').split('/')[0]);(kids[g]??=[]).push(n.id);if(n.kind!='package')owner[n.id]=g});
+  const gid=[...new Set([...Object.keys(kids),...G.nodes.filter(n=>n.kind=='package').map(n=>n.id)])];
+  const els=[];
+  gid.forEach(g=>{const lbl=g.startsWith('dir:')?g.slice(4)+'/':nm(byId[g]);els.push({data:{id:'G'+g,short:lbl+(collapsed.has(g)?' ('+(kids[g]||[]).length+')':'')},classes:'grp'});});
+  const vis=id=>owner[id]?(collapsed.has(owner[id])?'G'+owner[id]:id):id;
+  G.nodes.forEach(n=>{if(!owner[n.id])return;const o=mk(n);if(collapsed.has(owner[n.id]))return;o.data.parent='G'+owner[n.id];els.push(o)});
+  const agg={};
+  G.edges.forEach(e=>{if(!['calls','inherits','references','instantiates','imports'].includes(e.kind)||!activeKinds.has(e.kind))return;
+    const s=vis(e.source_id),t=vis(e.target_id);if(!s||!t||s==t||(!owner[e.source_id]&&!s.startsWith('G'))||(!owner[e.target_id]&&!t.startsWith('G')))return;
+    // collapse to one edge per directed pair (per-kind breakdown in label), but only aggregate when an endpoint is a collapsed group
+    const collapsedPair=s.startsWith('G')||t.startsWith('G');const key=collapsedPair?s+'|'+t:'e'+e.i;(agg[key]??={s,t,k:{},e})['k'][e.kind]=((agg[key].k[e.kind])||0)+1});
+  els.push(...Object.entries(agg).map(([k,a],i)=>{const tot=Object.values(a.k).reduce((x,y)=>x+y,0);const coll=k.includes('|');
+    return{data:{id:'a'+i,source:a.s,target:a.t,w:coll?1+Math.log2(1+tot)*1.5:2,c:coll?'#777':(EK[a.e.kind]||{}).c,ts:'triangle',ls:'solid',label:coll?Object.entries(a.k).map(([x,y])=>x+'×'+y).join(' '):''},classes:coll?'agg':''}}));
+  cy.add(els.filter(e=>!e.data.source||(cy.getElementById(e.data.source).nonempty()||els.some(z=>z.data.id==e.data.source))));
+  cy.nodes('.grp').forEach(g=>{if(collapsed.has(g.id().slice(1))){g.style({width:60,height:34,'background-opacity':.5,'text-valign':'center'})}});
+  cy.layout({name:'fcose',quality:'default',randomize:false,animate:true,animationDuration:400,nodeSeparation:90,idealEdgeLength:()=>110,nodeRepulsion:()=>9000,packComponents:true,tile:true}).run();
+  info(cy.nodes().length,0);zoomLabels();}
+// ---------- UI glue ----------
+function info(n,hidden){const f=byId[focus];$('info').innerHTML=VARS[vi][0]=='C'?`<i>Overview: dbl-click a group to ${'collapse/expand'}. ${collapsed.size} collapsed.</i>`:`<b>${nm(f)}</b> <small>${f.kind} ${f.language||''} ${rel(f.file_path)||'(external)'}</small>`;
+  $('status').textContent=VARS[vi][0]=='C'?cy.nodes().length+' nodes':`Showing ${n} nodes`+(hidden?` · ${hidden} hidden behind stubs`:'')+(root?` · root ${root}`:'');}
+function zoomLabels(){const low=cy.zoom()<.6;cy.nodes().toggleClass('lowzoom',low&&true)}
+cy.on('zoom',zoomLabels);
+cy.on('mouseover','node',e=>e.target.addClass('hov'));cy.on('mouseout','node',e=>e.target.removeClass('hov'));
+cy.on('tap','node',e=>{const n=e.target,id=n.id();
+  if(n.hasClass('stub')){const u=id.slice(5);moreSkip[u]=(moreSkip[u]||0)+(+$('cap').value);snapshot();rebuild();return}
+  if(VARS[vi][0]=='C'){if(!n.hasClass('grp')){focus=id;vi=0;setV(0)}return}
+  if(n.isParent()||id==focus)return;focus=id;for(const k in moreSkip)delete moreSkip[k];snapshot();rebuild();});
+cy.on('dbltap','node.grp',e=>{const g=e.target.id().slice(1);collapsed.has(g)?collapsed.delete(g):collapsed.add(g);overview()});
+$('q').onchange=()=>{const n=G.nodes.find(n=>nm(n)==$('q').value);if(n){focus=n.id;snapshot();rebuild()}};
+['depth','dir','cap'].forEach(i=>$(i).onchange=()=>{snapshot();rebuild()});
+$('reheat').onclick=()=>{sim?sim.alpha(.9).restart():colaL?colaL.run():0};
+$('pin').onclick=()=>{pinFocus=!pinFocus;if(sim&&sim.nodesById[focus]){const f=sim.nodesById[focus];if(pinFocus){f.fx=f.x;f.fy=f.y}else{f.fx=f.fy=null}}};
+// dragging in sim: user can still drag; cytoscape position is overwritten by sim ticks except grabbed
+cy.on('drag','node',e=>{if(sim){const s=sim.nodesById[e.target.id()];if(s){s.fx=e.target.position('x');s.fy=e.target.position('y');sim.alphaTarget(.2).restart()}}});
+cy.on('free','node',e=>{if(sim){const s=sim.nodesById[e.target.id()];if(s&&e.target.id()!=focus){s.fx=s.fy=null}sim.alphaTarget(0)}});
+function setV(i){vi=(i+VARS.length)%VARS.length;P.set('variant',VARS[vi][0]);history.replaceState(null,'','?'+P);$('vlabel').textContent=VARS[vi][0]+' ('+VARS[vi][1]+')';
+  if(VARS[vi][0]!='C')snapshot();rebuild();}
+$('prev').onclick=()=>setV(vi-1);$('next').onclick=()=>setV(vi+1);
+addEventListener('keydown',e=>{if(/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName))return;if(e.key=='ArrowLeft')setV(vi-1);if(e.key=='ArrowRight')setV(vi+1)});
+setV(vi);
+</script></body></html>
