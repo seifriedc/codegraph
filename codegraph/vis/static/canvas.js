@@ -4,9 +4,9 @@ import { toElements } from "./elements.js";
 import { createForceLayout } from "./layout.js";
 import { stylesheet } from "./style.js";
 
-export function createCanvas(container, { cytoscape, d3, onTapNode = () => {}, onLayoutState = () => {}, cyOptions = {} }) {
+export function createCanvas(container, { cytoscape, d3, onTapNode = () => {}, onLayoutState = () => {}, cyOptions = {}, extraStyle = [] }) {
   const cy = cytoscape({
-    container, style: stylesheet, wheelSensitivity: 0.3, minZoom: 0.1, maxZoom: 3, ...cyOptions,
+    container, style: [...stylesheet, ...extraStyle], wheelSensitivity: 0.3, minZoom: 0.1, maxZoom: 3, ...cyOptions,
   });
   let autoFit = true;
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 import concurrent.futures
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -40,6 +41,26 @@ def _count_loc_sloc(file_path: str | None, language: str | None) -> tuple[int, i
         if code:
             sloc += 1
     return total, sloc
+
+
+class _Grouping:
+    """What an overview grouping strategy returns.
+
+    groups:    {group id: {id, kind, name, qualified_name, file_path, node_id, parent}};
+               `node_id` is the real node a Group is (a file, a package), else None.
+    placement: {node id: id of the innermost Group it belongs to}; a Group's own node is
+               placed in that Group. Nodes absent from `placement` are not shown.
+    sizes:     {group id: nodes placed in the Group or any descendant}.
+    """
+
+    def __init__(self, groups: dict[str, dict], placement: dict[str, str]):
+        self.groups = groups
+        self.placement = placement
+        self.sizes = {gid: 0 for gid in groups}
+        for gid in placement.values():
+            while gid is not None:
+                self.sizes[gid] += 1
+                gid = groups[gid]["parent"]
 
 
 class Graph:
@@ -240,6 +261,137 @@ class Graph:
             [node_id],
         ).fetchall()
         return [r[0] for r in rows]
+
+    # ── Overview ──────────────────────────────────────────────────────────────
+
+    def edge_kinds(self) -> list[str]:
+        """Distinct edge kinds present in the graph, sorted."""
+        return [r[0] for r in self.conn.execute("SELECT DISTINCT kind FROM edges ORDER BY kind").fetchall()]
+
+    def overview(
+        self,
+        group_by: str = "directory",
+        expanded: list[str] | tuple[str, ...] = (),
+        kinds: list[str] | None = None,
+        externals: bool = True,
+    ) -> dict:
+        """Groups and derived Aggregate edges (ADR 0001: never stored).
+
+        `group_by` picks a grouping strategy from `_GROUPINGS`; a strategy returns a
+        `_Grouping` (a Group tree plus the Group each node is placed in), and the rest
+        of this method is strategy-independent. Collapsed Groups are leaves; Groups in
+        `expanded` show their child Groups, and expanded leaf-level Groups show their
+        member nodes. Aggregate edges connect the visible items: one per directed pair,
+        `kinds` = per-kind counts. `contains` is never aggregated; `kinds` (default all
+        others) filters which edge kinds are counted. Returns
+        {"groups", "nodes", "edges", "truncated", "total"}: `groups` are the visible Groups
+        (with `parent`, `expanded`, `member_count`), `nodes` the members of expanded
+        Groups (with `parent`), `edges` {id, source_id, target_id, kinds, count}.
+        """
+        try:
+            strategy = self._GROUPINGS[group_by]
+        except KeyError:
+            raise ValueError(f"unknown group_by {group_by!r}; expected one of {sorted(self._GROUPINGS)}")
+        grouping = getattr(self, strategy)(externals)
+        groups = grouping.groups
+
+        open_groups = set(expanded)
+
+        def collapsed_at(group_id: str) -> str | None:
+            """The outermost collapsed Group on the chain to `group_id` (None: all open)."""
+            chain = []
+            gid = group_id
+            while gid is not None:
+                chain.append(gid)
+                gid = groups[gid]["parent"]
+            return next((g for g in reversed(chain) if g not in open_groups), None)
+
+        def visible_item(node_id: str) -> str | None:
+            """Id of what stands for a node in the current view (a Group or the node)."""
+            gid = grouping.placement.get(node_id)
+            if gid is None:
+                return None
+            return collapsed_at(gid) or (gid if groups[gid]["node_id"] == node_id else node_id)
+
+        edge_sql, params = "SELECT source_id, target_id, kind FROM edges WHERE kind <> 'contains'", []
+        wanted = [k for k in (kinds or []) if k != "contains"]
+        if kinds is not None:
+            edge_sql += f" AND kind IN (SELECT unnest(?))"
+            params.append(wanted)
+        counts: dict[tuple[str, str], dict[str, int]] = {}
+        for s, t, kind in self.conn.execute(edge_sql, params).fetchall():
+            a, b = visible_item(s), visible_item(t)
+            if a is None or b is None or a == b:
+                continue
+            per_kind = counts.setdefault((a, b), {})
+            per_kind[kind] = per_kind.get(kind, 0) + 1
+        edges = [
+            {"id": f"agg:{a}>{b}", "source_id": a, "target_id": b,
+             "kinds": dict(sorted(k.items())), "count": sum(k.values())}
+            for (a, b), k in sorted(counts.items())
+        ]
+
+        def shown(g: dict) -> bool:
+            return g["parent"] is None or (g["parent"] in open_groups and shown(groups[g["parent"]]))
+
+        out_groups = sorted(
+            ({**g, "expanded": g["id"] in open_groups, "member_count": grouping.sizes[g["id"]]}
+             for g in groups.values() if shown(g)),
+            key=lambda g: (g["parent"] or "", g["kind"], g["name"], g["id"]),
+        )
+        shown_open = [g["id"] for g in out_groups if g["expanded"]]
+        members = self._fetchall(
+            "SELECT * FROM nodes WHERE id IN (SELECT unnest(?))",
+            [[n for n, gid in grouping.placement.items()
+              if gid in shown_open and groups[gid]["node_id"] != n]],
+        )
+        for m in members:
+            m["parent"] = grouping.placement[m["id"]]
+        members.sort(key=lambda m: (m["parent"], m["line_start"] or 0, m["name"], m["id"]))
+        return {"groups": out_groups, "nodes": members, "edges": edges,
+                "truncated": False, "total": len(out_groups) + len(members)}
+
+    _GROUPINGS = {"directory": "_directory_grouping"}
+
+    def _directory_grouping(self, externals: bool) -> "_Grouping":
+        """Directories (derived, id `dir:<abs path>`) > files > member nodes.
+
+        The common ancestor of all indexed files is the invisible root. Nodes without a
+        `file_path` (External placeholders) go in one `external` Group when `externals`.
+        """
+        rows = self._fetchall(
+            "SELECT id, kind, name, qualified_name, file_path FROM nodes")
+        files = {r["file_path"]: r for r in rows if r["kind"] == "file" and r["file_path"]}
+        dirs = [os.path.dirname(p) for p in files]
+        root = os.path.commonpath(dirs) if dirs else None
+        groups: dict[str, dict] = {}
+
+        def dir_group(path: str) -> str | None:
+            if path == root or not path:
+                return None
+            gid = f"dir:{path}"
+            if gid not in groups:
+                groups[gid] = {"id": gid, "kind": "directory", "name": os.path.basename(path),
+                               "qualified_name": path, "file_path": path, "node_id": None,
+                               "parent": dir_group(os.path.dirname(path))}
+            return gid
+
+        for path, f in files.items():
+            groups[f["id"]] = {"id": f["id"], "kind": "file", "name": f["name"],
+                               "qualified_name": f["qualified_name"], "file_path": path,
+                               "node_id": f["id"], "parent": dir_group(os.path.dirname(path))}
+        placement: dict[str, str] = {}
+        for r in rows:
+            f = files.get(r["file_path"]) if r["file_path"] else None
+            if f is not None:
+                placement[r["id"]] = f["id"]
+            elif externals and r["kind"] != "file":
+                if "external" not in groups:
+                    groups["external"] = {"id": "external", "kind": "external", "name": "external",
+                                          "qualified_name": None, "file_path": None,
+                                          "node_id": None, "parent": None}
+                placement[r["id"]] = "external"
+        return _Grouping(groups, placement)
 
     # ── High-level queries ────────────────────────────────────────────────────
 
