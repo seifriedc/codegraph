@@ -42,6 +42,10 @@
     #panel td:nth-child(n+2), #panel th:nth-child(n+2) { text-align: right; }
     .muted { color: var(--muted); }
     button { cursor: pointer; }
+    body[data-view="overview"] .focus-only, body:not([data-view="overview"]) .overview-only { display: none; }
+    #ov-kinds label { margin-right: 8px; }
+    #tip { position: absolute; z-index: 10; pointer-events: none; white-space: pre; padding: 4px 8px;
+           background: #222; color: #fff; border-radius: 4px; font-size: 12px; }
     .search { position: relative; }
     .s-input { width: 280px; padding: 4px 8px; }
     .s-chips { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
@@ -63,22 +67,28 @@
   <header>
     <h1>codegraph</h1>
     <div id="search" class="search"></div>
-    <label>View
+    <button id="ov-home" type="button" class="focus-only" title="Back to the overview">Overview</button>
+    <span id="ov-controls" class="overview-only">
+      <span id="ov-kinds" title="Edge kinds counted in Aggregate edges"></span>
+      <span id="ov-selection" class="muted"></span>
+      <button id="ov-focus" type="button" disabled title="Open the selected node in the focus view">Focus</button>
+    </span>
+    <label class="focus-only">View
       <select id="view">
         <option value="focus">focus</option>
         <option value="type">type hierarchy</option>
         <option value="declaration">declaration hierarchy</option>
       </select>
     </label>
-    <label>Show <select id="mode"></select></label>
-    <label>Depth <select id="depth"></select></label>
-    <span id="rings" class="muted" title="Nodes per ring (distance from the focus)"></span>
+    <label class="focus-only">Show <select id="mode"></select></label>
+    <label class="focus-only">Depth <select id="depth"></select></label>
+    <span id="rings" class="muted focus-only" title="Nodes per ring (distance from the focus)"></span>
     <button id="recenter" type="button" title="Fit all nodes in view">Recenter</button>
     <span id="layout-state"></span>
     <span id="status">Loading...</span>
   </header>
   <aside id="legend"></aside>
-  <div id="stage"><div id="cy"></div><div id="mini-legend"></div></div>
+  <div id="stage"><div id="cy"></div><div id="mini-legend"></div><div id="tip" hidden></div></div>
   <aside id="panel"></aside>
 
   <!-- Vendored, pinned libraries (classic scripts: they define window.cytoscape and window.d3). -->
@@ -88,6 +98,9 @@
   <script src="vendor/d3-timer.min.js"></script>
   <script src="vendor/d3-force.min.js"></script>
   <script src="vendor/dagre.min.js"></script>
+  <script src="vendor/layout-base.js"></script>
+  <script src="vendor/cose-base.js"></script>
+  <script src="vendor/cytoscape-fcose.js"></script>
   <script type="module" src="main.js"></script>
 </body>
 </html>

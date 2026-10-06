@@ -44,6 +44,34 @@ class NeighborhoodResponse(BaseModel):
     ring_counts: dict[int, int] | None = None
 
 
+class OverviewNode(VisNode):
+    """A Group (group=True; id may be derived, e.g. a directory) or a member of an expanded Group."""
+    group: bool
+    parent: str | None  # id of the enclosing expanded Group (Cytoscape compound parent)
+    expanded: bool
+    member_count: int  # nodes inside the Group, recursively (0 for members)
+    node_id: str | None  # real node to focus on / fetch details for; None for derived Groups
+
+
+class OverviewEdge(BaseModel):
+    """Aggregate edge: derived, one per directed pair of visible items."""
+    id: str
+    source_id: str
+    target_id: str
+    kinds: dict[str, int]  # per-kind counts
+    count: int
+
+
+class OverviewResponse(BaseModel):
+    group_by: str
+    kinds: list[str]  # edge kinds counted in this response
+    available_kinds: list[str]  # every aggregatable kind in the graph (never `contains`)
+    nodes: list[OverviewNode]
+    edges: list[OverviewEdge]
+    truncated: bool
+    total: int
+
+
 class NodeDetail(VisNode):
     defining_files: list[str]
     # distinct neighbour nodes per edge kind: {"in": {kind: n}, "out": {kind: n}}

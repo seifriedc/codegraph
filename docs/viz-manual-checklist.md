@@ -17,3 +17,15 @@ Index the C++ fixtures, run `codegraph serve`, open `#focus=Shape`.
 - [ ] Unchecking an edge kind hides it and refetches with the `kinds` param (check the network tab).
 - [ ] The on-canvas mini legend (bottom-left) shows only kinds that are visible and present, and collapses/expands.
 - [ ] Layout and refocus still behave (positions stable) with filters active.
+
+## Overview with Directory grouping (ticket 24)
+
+Index `tests/fixtures`, run `codegraph serve`, open the bare URL (no hash). Not verified in a browser by the implementer.
+
+- [ ] The overview is the landing view; the search box has focus; depth/mode/view controls and the legend are hidden.
+- [ ] Top level shows `ada`, `c`, `cpp` Groups (labelled with sizes) and one external Group; edges have arrowheads and log-scaled thickness.
+- [ ] `calls` is unchecked in the kind filter; ticking it adds edges, and unticking an edge kind re-aggregates (thickness changes, empty pairs disappear).
+- [ ] Hovering an edge shows the source and target and per-kind counts (e.g. `calls: 2, references: 1`).
+- [ ] Clicking a collapsed Group expands it in place (a box around its files, fcose re-settles, other Groups stay put); clicking an expanded box collapses it. Back/forward and reload keep the expansion (`expanded=` in the hash).
+- [ ] Expanding a file shows its functions/classes inside it; selecting any node with a real id enables Focus, which opens `#focus=<id>`; the Overview button returns.
+- [ ] Choosing a search result from the overview switches to the focus view.

@@ -9,7 +9,7 @@ from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from codegraph.query import Graph
-from codegraph.vis import focus, hierarchy, search
+from codegraph.vis import focus, hierarchy, overview, search
 from codegraph.vis.models import StatsResponse
 from codegraph.vis.paths import common_root, make_relativizer
 
@@ -43,6 +43,7 @@ def create_app(db_path: str | Path) -> FastAPI:
     focus.register(app, get_graph, rel)
     search.register(app, get_graph, rel)
     hierarchy.register(app, get_graph, rel)
+    overview.register(app, get_graph, rel)
 
     # Mounted last so /api routes win; serves index.html at "/".
     app.mount("/", StaticFiles(directory=static_dir(), html=True), name="static")
