@@ -14,11 +14,15 @@ dependencies = [
     "tree-sitter-c>=0.23",
     "tree-sitter-cpp>=0.23",
     "tree-sitter-python>=0.23",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
+    "httpx>=0.27",
+    "setuptools>=68",
 ]
 
 [project.scripts]
@@ -27,6 +31,9 @@ codegraph = "codegraph.cli:app"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["codegraph*"]
+
+[tool.setuptools.package-data]
+"codegraph.vis" = ["static/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
