@@ -36,6 +36,14 @@ def test_bundle_modules_are_served(client):
     assert "javascript" in r.headers["content-type"]
 
 
+def test_encoding_and_legend_modules_are_served(client):
+    for name in ("style.js", "filters.js", "legend.js"):
+        r = client.get(f"/{name}")
+        assert r.status_code == 200, name
+        assert "javascript" in r.headers["content-type"]
+    assert 'id="legend"' in client.get("/").text
+
+
 def test_serving_never_modifies_the_database(indexed_db):
     before = indexed_db.read_bytes()
     with TestClient(create_app(indexed_db)) as c:

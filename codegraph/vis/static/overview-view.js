@@ -11,8 +11,9 @@ export const overviewStyle = [
       shape: "round-rectangle", "background-color": "#d9e2ef", "border-color": "#6b7a90", "border-width": 1.5,
       width: (ele) => 28 + 8 * Math.log2(1 + (ele.data("memberCount") || 0)),
       height: (ele) => 22 + 5 * Math.log2(1 + (ele.data("memberCount") || 0)),
-      "font-size": 12, "text-valign": "center", "text-halign": "center", "text-margin-y": 0,
-      "text-max-width": 140, "text-wrap": "ellipsis",
+      // always labelled (the shared label policy hides labels when zoomed out); font size stays the shared
+      // on-screen-constant one
+      label: "data(label)", "text-valign": "center", "text-halign": "center", "text-margin-y": 0,
     },
   },
   { selector: "node[kind = 'file'][?group]", style: { "background-color": "#eeeeee" } },
@@ -21,13 +22,14 @@ export const overviewStyle = [
     selector: "node[?group]:parent",
     style: {
       "background-opacity": 0.14, "border-opacity": 0.8, padding: 16, "text-valign": "top", "text-halign": "center",
-      "text-margin-y": -4, "font-weight": "bold",
+      "font-weight": "bold",
     },
   },
   { selector: "node:selected", style: { "border-width": 4, "border-color": "#1d4ed8" } },
   {
     selector: "edge[?aggregate]",
-    style: { width: "data(w)", "line-color": "#8a93a3", "target-arrow-color": "#8a93a3", opacity: 0.7, "arrow-scale": 0.8 },
+    style: { width: "data(w)", "line-color": "#8a93a3", "target-arrow-color": "#8a93a3", opacity: 0.7,
+             "arrow-scale": 0.8, "target-arrow-shape": "triangle", "curve-style": "bezier" },
   },
   { selector: "edge[?aggregate]:selected, edge[?aggregate].hover", style: { "line-color": "#1d4ed8", "target-arrow-color": "#1d4ed8", opacity: 1 } },
 ];

@@ -20,7 +20,7 @@ test("view defaults: empty hash is the overview, a focus makes it the focus view
 });
 
 test("overview state round-trips: expanded ids, kind override, group_by", () => {
-  const s = { ...DEFAULTS, focus: null, expanded: ["dir:/a,b", "f-1"], okinds: ["calls", "imports"] };
+  const s = { ...DEFAULTS, focus: null, view: "overview", expanded: ["dir:/a,b", "f-1"], okinds: ["calls", "imports"] };
   assert.deepEqual(parseHash(formatHash(s)), s);
   assert.deepEqual(parseHash("").expanded, []);
   assert.equal(parseHash("").okinds, null, "absent means server default (calls off)");
