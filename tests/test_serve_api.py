@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from codegraph.vis.app import create_app
+from conftest import FIXTURES
 
 
 @pytest.fixture
@@ -14,10 +15,11 @@ def client(indexed_db):
 
 def test_stats_reports_counts_for_indexed_fixtures(client):
     body = client.get("/api/stats").json()
-    assert body["total_files"] == 5  # 3 ada + 1 c + 1 cpp
+    expected_files = len([f for f in FIXTURES.rglob("*") if f.suffix in {".ads", ".adb", ".c", ".cpp"}])
+    assert body["total_files"] == expected_files
     assert body["total_nodes"] > 0 and body["total_edges"] > 0
     assert set(body["nodes_by_language"]) >= {"ada", "c", "cpp"}
-    assert body["nodes_by_kind"]["file"] == 5
+    assert body["nodes_by_kind"]["file"] == expected_files
     assert body["edges_by_kind"]
 
 
