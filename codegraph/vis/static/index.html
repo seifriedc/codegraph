@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>codegraph</title>
+  <style>
+    :root {
+      --bg: #fafafa; --panel-bg: #fff; --border: #d0d0d0; --text: #222; --muted: #777;
+      --accent: #1d4ed8;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; height: 100vh; display: grid; grid-template-rows: auto 1fr; grid-template-columns: 210px 1fr 300px;
+           font: 13px system-ui, sans-serif; background: var(--bg); color: var(--text); }
+    header { grid-column: 1 / -1; display: flex; gap: 12px; align-items: center; padding: 6px 12px;
+             background: var(--panel-bg); border-bottom: 1px solid var(--border); }
+    header h1 { font-size: 14px; margin: 0 8px 0 0; }
+    #status { flex: 1; color: var(--muted); }
+    #layout-state { color: var(--muted); min-width: 4.5em; }
+    #stage { min-height: 0; position: relative; }
+    #cy { position: absolute; inset: 0; }
+    #legend { overflow: auto; padding: 8px 10px; background: var(--panel-bg); border-right: 1px solid var(--border); }
+    #legend h3 { font-size: 12px; text-transform: uppercase; color: var(--muted); margin: 8px 0 4px; }
+    .legend-row { display: flex; align-items: center; gap: 6px; padding: 1px 0; cursor: pointer; }
+    .legend-row.off { opacity: 0.45; }
+    .legend-kind { flex: 1; }
+    .legend-count { color: var(--muted); font-variant-numeric: tabular-nums; }
+    #mini-legend { position: absolute; left: 8px; bottom: 8px; max-height: 60%; overflow: auto; z-index: 5;
+                   background: rgba(255,255,255,0.92); border: 1px solid var(--border); border-radius: 4px;
+                   padding: 4px 8px; font-size: 12px; }
+    #mini-legend:empty { display: none; }
+    #mini-legend summary { cursor: pointer; color: var(--muted); }
+    #mini-legend .legend-row { cursor: default; }
+    #panel { overflow: auto; padding: 12px; background: var(--panel-bg); border-left: 1px solid var(--border); }
+    #panel h2 { font-size: 15px; margin: 0 0 8px; word-break: break-all; }
+    #panel h3 { font-size: 12px; text-transform: uppercase; color: var(--muted); margin: 14px 0 4px; }
+    #panel dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 0; }
+    #panel dt { color: var(--muted); } #panel dd { margin: 0; word-break: break-all; }
+    #panel ul { margin: 0; padding-left: 16px; word-break: break-all; }
+    #panel table { border-collapse: collapse; width: 100%; }
+    #panel th, #panel td { text-align: left; padding: 2px 6px; border-bottom: 1px solid var(--border); }
+    #panel td:nth-child(n+2), #panel th:nth-child(n+2) { text-align: right; }
+    .muted { color: var(--muted); }
+    button { cursor: pointer; }
+    body[data-view="overview"] .focus-only, body:not([data-view="overview"]) .overview-only { display: none; }
+    #ov-kinds label { margin-right: 8px; }
+    #tip { position: absolute; z-index: 10; pointer-events: none; white-space: pre; padding: 4px 8px;
+           background: #222; color: #fff; border-radius: 4px; font-size: 12px; }
+    #trunc { background: #fef3c7; border: 1px solid #f59e0b; padding: 2px 8px; border-radius: 4px; }
+    #warn { background: #fef3c7; border: 1px solid #f59e0b; padding: 2px 8px; border-radius: 4px; }
+    .search { position: relative; }
+    .s-input { width: 280px; padding: 4px 8px; }
+    .s-chips { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
+    .s-chip { font-size: 11px; padding: 0 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-bg); }
+    .s-chip[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .s-drop { position: absolute; top: 100%; left: 0; z-index: 10; width: 420px; max-height: 60vh; overflow: auto;
+              background: var(--panel-bg); border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,.15); }
+    .s-row { padding: 4px 8px; cursor: pointer; border-bottom: 1px solid var(--border); }
+    .s-row.selected, .s-row:hover { background: #e8eefc; }
+    .s-top { display: flex; gap: 6px; align-items: baseline; }
+    .s-kind { font-size: 10px; text-transform: uppercase; color: var(--muted); min-width: 4.5em; }
+    .s-name { font-weight: 600; flex: 1; }
+    .s-lang { font-size: 10px; border: 1px solid var(--border); border-radius: 3px; padding: 0 4px; color: var(--muted); }
+    .s-qn, .s-path { color: var(--muted); font-size: 11px; word-break: break-all; }
+    .s-note, .s-head { padding: 4px 8px; color: var(--muted); font-size: 11px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>codegraph</h1>
+    <div id="search" class="search"></div>
+    <button id="ov-home" type="button" class="focus-only" title="Back to the overview">Overview</button>
+    <span id="ov-controls" class="overview-only">
+      <label>Group by
+        <select id="ov-groupby" title="Directory: directories and files. Package: Ada Packages; files for C and C++">
+          <option value="directory">Directory</option>
+          <option value="package">Package</option>
+        </select>
+      </label>
+      <label title="Show external placeholders as one Group"><input id="ov-externals" type="checkbox"> externals</label>
+      <span id="ov-kinds" title="Edge kinds counted in Aggregate edges"></span>
+      <span id="ov-selection" class="muted"></span>
+      <button id="ov-focus" type="button" disabled title="Open the selected node in the focus view">Focus</button>
+    </span>
+    <label>View
+      <select id="view">
+        <option value="overview">overview</option>
+        <option value="focus">focus</option>
+        <option value="type">type hierarchy</option>
+        <option value="declaration">declaration hierarchy</option>
+      </select>
+    </label>
+    <label class="focus-only">Show <select id="mode"></select></label>
+    <label class="focus-only" title="Edge direction (neighborhood mode only)">Direction
+      <select id="direction">
+        <option value="both">both</option>
+        <option value="out">out (what it points to)</option>
+        <option value="in">in (what points to it)</option>
+      </select>
+    </label>
+    <label class="focus-only">Depth <select id="depth"></select></label>
+    <span id="rings" class="muted focus-only" title="Nodes per ring (distance from the focus)"></span>
+    <button id="recenter" type="button" title="Fit all nodes in view">Recenter</button>
+    <button id="reset-zoom" type="button" title="Reset zoom to 100%">Reset zoom</button>
+    <button id="raise-limit" type="button" hidden title="Show more nodes (server maximum 500)"></button>
+    <button id="undo" type="button" disabled title="Undo the last expansion">Undo expand</button>
+    <span id="layout-state"></span>
+    <span id="status">Loading...</span>
+    <span id="trunc" hidden role="status"></span>
+    <span id="warn" hidden><span id="warn-text"></span>
+      <button id="prune" type="button" title="Drop all expansions, keep the focus neighborhood">Prune to focus neighborhood</button></span>
+  </header>
+  <aside id="legend"></aside>
+  <div id="stage"><div id="cy"></div><div id="mini-legend"></div><div id="tip" hidden></div></div>
+  <aside id="panel"></aside>
+
+  <!-- Vendored, pinned libraries (classic scripts: they define window.cytoscape and window.d3). -->
+  <script src="vendor/cytoscape.min.js"></script>
+  <script src="vendor/d3-dispatch.min.js"></script>
+  <script src="vendor/d3-quadtree.min.js"></script>
+  <script src="vendor/d3-timer.min.js"></script>
+  <script src="vendor/d3-force.min.js"></script>
+  <script src="vendor/dagre.min.js"></script>
+  <script src="vendor/layout-base.js"></script>
+  <script src="vendor/cose-base.js"></script>
+  <script src="vendor/cytoscape-fcose.js"></script>
+  <script type="module" src="main.js"></script>
+</body>
+</html>

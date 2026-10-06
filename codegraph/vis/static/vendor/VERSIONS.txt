@@ -1,0 +1,13 @@
+Vendored minified libraries, downloaded unmodified from jsDelivr (https://cdn.jsdelivr.net/npm/<pkg>@<version>/dist/...).
+Loaded as classic scripts by index.html (UMD builds define window.cytoscape and window.d3).
+
+cytoscape     3.34.1  (MIT)
+d3-dispatch   3.0.1   (ISC)
+d3-quadtree   3.0.1   (ISC)
+d3-timer      3.0.1   (ISC)
+d3-force      3.0.0   (ISC)
+
+layout-base   2.0.1   (MIT)  [unminified dist build; no .min published]
+cose-base     2.2.0   (MIT)  [unminified dist build]
+cytoscape-fcose 2.2.0 (MIT)  [unminified dist build]; load order: layout-base, cose-base, cytoscape-fcose
+dagre        3.1.1   (MIT)  @dagrejs/dagre dist/dagre.min.js (IIFE, defines window.dagre incl. graphlib)
