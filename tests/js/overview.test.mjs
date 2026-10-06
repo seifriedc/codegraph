@@ -91,3 +91,14 @@ test("fetchOverview sends expanded ids as repeated params and an explicit kind l
   await fetchOverview({}, f);
   assert.equal(seen, "/api/overview");
 });
+
+test("every view value round-trips through parseHash/formatHash", async () => {
+  const { parseHash, formatHash, VIEWS } = await import("../../codegraph/vis/static/state.js");
+  assert.deepEqual([...VIEWS].sort(), ["declaration", "focus", "overview", "type"]);
+  for (const view of VIEWS) for (const focus of [null, "Shape"]) {
+    const s = { ...parseHash(""), focus, view };
+    const back = parseHash(formatHash(s));
+    assert.equal(back.view, view);
+    assert.equal(back.focus, focus);
+  }
+});

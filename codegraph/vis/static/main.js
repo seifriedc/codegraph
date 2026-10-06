@@ -141,6 +141,7 @@ function drawLegends() {
 async function render() {
   const seq = ++requestSeq;
   enterView(state.view === "overview" ? "overview" : "focus");
+  $("view").value = state.view;
   if (state.view === "overview") return renderOverview(seq);
   $("depth").value = String(state.depth);
   $("mode").value = state.mode;
