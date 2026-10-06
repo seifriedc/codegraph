@@ -154,6 +154,30 @@ class Graph:
 
     # ── Neighborhood ──────────────────────────────────────────────────────────
 
+    def _ranked_groups(
+        self, owners: list[str], steps: list[tuple[str, str, str]], kind_sql: str, kind_params: list
+    ) -> dict[tuple[str, str, str], list[str]]:
+        """Distinct neighbours of each owner per (owner, direction, edge kind), sorted by qualified name.
+
+        `steps` is a list of (direction, owner column, neighbour column). Self-loops are ignored.
+        """
+        groups: dict[tuple[str, str, str], set[tuple[str, str]]] = {}
+        for direction, own_col, nb_col in steps:
+            rows = self.conn.execute(
+                f"SELECT DISTINCT e.{own_col}, e.kind, e.{nb_col}, COALESCE(n.qualified_name, n.name) "
+                f"FROM edges e JOIN nodes n ON n.id = e.{nb_col} "
+                f"WHERE e.{own_col} IN (SELECT unnest(?)) AND e.{nb_col} <> e.{own_col} {kind_sql}",
+                [owners, *kind_params],
+            ).fetchall()
+            for owner, kind, nb, key in rows:
+                groups.setdefault((owner, direction, kind), set()).add((key, nb))
+        return {g: [nb for _, nb in sorted(v)] for g, v in groups.items()}
+
+    @staticmethod
+    def _steps(direction: str) -> list[tuple[str, str, str]]:
+        out, in_ = ("out", "source_id", "target_id"), ("in", "target_id", "source_id")
+        return {"out": [out], "in": [in_], "both": [out, in_]}[direction]
+
     def neighborhood(
         self,
         node_id: str,
@@ -161,15 +185,20 @@ class Graph:
         depth: int = 1,
         edge_kinds: list[str] | None = None,
         limit: int | None = None,
+        per_node_cap: int | None = None,
     ) -> dict | None:
         """Nodes within `depth` of a Focus node, plus every edge among the included nodes.
 
         direction: 'out' (source to target), 'in' (reverse) or 'both'. Each returned
         node is a node dict with an added `depth` (0 for the focus). `limit` caps the
         node count: the deepest BFS ring is dropped first (a ring that only partly fits
-        keeps its first nodes by qualified name). Returns
-        {"nodes", "edges", "truncated", "total"} where total is the untruncated node
-        count, or None if the focus node does not exist.
+        keeps its first nodes by qualified name). `per_node_cap` caps the neighbours
+        followed per node, edge kind and direction (first by qualified name); each
+        overflowing group yields a Stub node record
+        {"id", "owner", "direction", "kind", "hidden", "offset"} where `offset` is the
+        number of neighbours already shown (page the rest in with `neighbors_page`).
+        Returns {"nodes", "edges", "stubs", "truncated", "total"} where total is the
+        untruncated node count, or None if the focus node does not exist.
         """
         focus = self.node_by_id(node_id)
         if focus is None:
@@ -180,22 +209,20 @@ class Graph:
             kind_sql = f"AND e.kind IN ({', '.join('?' * len(edge_kinds))})"
             kind_params = list(edge_kinds)
 
-        steps = {"out": [("source_id", "target_id")], "in": [("target_id", "source_id")],
-                 "both": [("source_id", "target_id"), ("target_id", "source_id")]}[direction]
-
+        steps = self._steps(direction)
         depth_of: dict[str, int] = {node_id: 0}
+        stubs: list[dict] = []
         frontier = [node_id]
         for d in range(1, depth + 1):
             if not frontier:
                 break
             found: set[str] = set()
-            for src_col, dst_col in steps:
-                rows = self.conn.execute(
-                    f"SELECT DISTINCT e.{dst_col} FROM edges e "
-                    f"WHERE e.{src_col} IN (SELECT unnest(?)) {kind_sql}",
-                    [frontier, *kind_params],
-                ).fetchall()
-                found.update(r[0] for r in rows)
+            for (owner, dirn, kind), nbs in sorted(self._ranked_groups(frontier, steps, kind_sql, kind_params).items()):
+                if per_node_cap is not None and len(nbs) > per_node_cap:
+                    stubs.append({"id": f"stub:{owner}:{dirn}:{kind}", "owner": owner, "direction": dirn,
+                                  "kind": kind, "hidden": len(nbs) - per_node_cap, "offset": per_node_cap})
+                    nbs = nbs[:per_node_cap]
+                found.update(nbs)
             frontier = sorted(i for i in found if i not in depth_of)
             for i in frontier:
                 depth_of[i] = d
@@ -212,12 +239,43 @@ class Graph:
             rows = rows[:limit]
 
         ids = [r["id"] for r in rows]
+        kept = set(ids)
         edges = self._fetchall(
             f"SELECT * FROM edges e WHERE e.source_id IN (SELECT unnest(?)) "
             f"AND e.target_id IN (SELECT unnest(?)) {kind_sql} ORDER BY e.id",
             [ids, ids, *kind_params],
         )
-        return {"nodes": rows, "edges": edges, "truncated": truncated, "total": total}
+        stubs = [s for s in stubs if s["owner"] in kept]
+        return {"nodes": rows, "edges": edges, "stubs": stubs, "truncated": truncated, "total": total}
+
+    def neighbors_page(
+        self, node_id: str, direction: str, kind: str, offset: int = 0, limit: int = 15
+    ) -> dict | None:
+        """One page of a node's neighbours for a single edge kind and direction ('in' or 'out').
+
+        Neighbours are ordered as in `neighborhood` (by qualified name), so a Stub node's
+        `offset` continues exactly where the capped view stopped. Returns
+        {"nodes", "edges", "total", "hidden"}: nodes carry depth 1, edges are those between
+        the owner and the page, `total` counts all neighbours in the group and `hidden`
+        those still unseen after this page. None if the node does not exist.
+        """
+        if self.node_by_id(node_id) is None:
+            return None
+        groups = self._ranked_groups([node_id], self._steps(direction), "AND e.kind = ?", [kind])
+        nbs = groups.get((node_id, direction, kind), [])
+        page = nbs[offset:offset + limit]
+        nodes = self._fetchall("SELECT * FROM nodes WHERE id IN (SELECT unnest(?))", [page])
+        for n in nodes:
+            n["depth"] = 1
+        nodes.sort(key=lambda n: page.index(n["id"]))
+        src, dst = ("source_id", "target_id") if direction == "out" else ("target_id", "source_id")
+        edges = self._fetchall(
+            f"SELECT * FROM edges e WHERE e.{src} = ? AND e.{dst} IN (SELECT unnest(?)) "
+            f"AND e.kind = ? ORDER BY e.id",
+            [node_id, page, kind],
+        )
+        return {"nodes": nodes, "edges": edges, "total": len(nbs),
+                "hidden": max(0, len(nbs) - offset - len(page))}
 
     def neighbour_counts(self, node_id: str) -> dict[str, dict[str, int]]:
         """Distinct neighbour nodes per edge kind, split by direction: {"in": {...}, "out": {...}}."""

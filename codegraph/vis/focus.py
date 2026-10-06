@@ -6,10 +6,12 @@ from typing import Callable, Literal
 from fastapi import Depends, FastAPI, HTTPException, Query
 
 from codegraph.query import Graph
-from codegraph.vis.models import NeighborhoodResponse, NodeDetail, VisEdge, VisNode
+from codegraph.vis.models import NeighborhoodResponse, NodeDetail, VisEdge, VisNode, VisStub
 
 DEFAULT_LIMIT = 150
 MAX_LIMIT = 500
+DEFAULT_PER_NODE_CAP = 15
+MAX_PER_NODE_CAP = 100
 MAX_DEPTH = 10
 
 
@@ -33,6 +35,7 @@ def register(app: FastAPI, get_graph: Callable, rel: Callable[[str | None], str 
         depth: int = Query(1, ge=0, le=MAX_DEPTH),
         kinds: str | None = Query(None, description="comma-separated edge kinds"),
         limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+        per_node_cap: int = Query(DEFAULT_PER_NODE_CAP, ge=1, le=MAX_PER_NODE_CAP),
         g: Graph = Depends(get_graph),
     ) -> dict:
         focus = g.resolve_node(node_id)
@@ -40,11 +43,12 @@ def register(app: FastAPI, get_graph: Callable, rel: Callable[[str | None], str 
             raise HTTPException(404, f"node not found: {node_id}")
         edge_kinds = [k for k in kinds.split(",") if k] if kinds else None
         r = g.neighborhood(focus["id"], direction=direction, depth=depth,
-                           edge_kinds=edge_kinds, limit=limit)
+                           edge_kinds=edge_kinds, limit=limit, per_node_cap=per_node_cap)
         return {
             "focus": focus["id"],
             "nodes": [shape_node(n, rel) for n in r["nodes"]],
             "edges": [VisEdge(**{k: e[k] for k in ("id", "kind", "source_id", "target_id")}) for e in r["edges"]],
+            "stubs": [VisStub(**st) for st in r["stubs"]],
             "truncated": r["truncated"],
             "total": r["total"],
         }
