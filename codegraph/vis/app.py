@@ -9,7 +9,7 @@ from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from codegraph.query import Graph
-from codegraph.vis import focus
+from codegraph.vis import focus, search
 from codegraph.vis.models import StatsResponse
 from codegraph.vis.paths import common_root, make_relativizer
 
@@ -41,6 +41,7 @@ def create_app(db_path: str | Path) -> FastAPI:
 
     rel = make_relativizer(common_root([f["file_path"] for f in root.nodes(kind="file")]))
     focus.register(app, get_graph, rel)
+    search.register(app, get_graph, rel)
 
     # Mounted last so /api routes win; serves index.html at "/".
     app.mount("/", StaticFiles(directory=static_dir(), html=True), name="static")

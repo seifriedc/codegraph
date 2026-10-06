@@ -1,10 +1,13 @@
 // Entry point: wires URL state, API, canvas and panel. Plain ES module, no build step.
 // Vendored libs (cytoscape, d3) are classic scripts that set window globals; see index.html.
-import { fetchNeighborhood, fetchNode } from "./api.js";
+import { fetchNeighborhood, fetchNode, fetchSearch } from "./api.js";
 import { createCanvas } from "./canvas.js";
 import { statusText } from "./elements.js";
 import { renderPanel } from "./panel.js";
 import { depthOptions, MODES, ringText } from "./reach.js";
+import { createRecent } from "./recent.js";
+import { mergeGraphs } from "./search.js";
+import { mountSearch } from "./search-ui.js";
 import { formatHash, parseHash } from "./state.js";
 
 const $ = (id) => document.getElementById(id);
@@ -18,6 +21,7 @@ const canvas = createCanvas($("cy"), {
 });
 
 let state = parseHash(location.hash);
+let lastHood = null; // last graph shown, so Shift-Enter search results can be merged into it
 let requestSeq = 0; // ignore responses that arrive after a newer request
 
 function setState(patch, { push = false } = {}) {
@@ -53,6 +57,7 @@ async function render() {
       return;
     }
     $("status").textContent = statusText(hood);
+    lastHood = hood;
     $("rings").textContent = ringText(hood.ring_counts, state.depth);
     canvas.show(hood);
     renderPanel($("panel"), detail);
@@ -67,5 +72,22 @@ $("depth").addEventListener("change", (e) => setState({ depth: Number(e.target.v
 $("mode").addEventListener("change", (e) => setState({ mode: e.target.value }));
 $("recenter").addEventListener("click", () => canvas.recenter());
 addEventListener("hashchange", () => { state = parseHash(location.hash); render(); });
+
+let storage;
+try { storage = window.localStorage; } catch { storage = undefined; } // even reading it can throw
+export const search = mountSearch($("search"), {
+  fetchFn: fetchSearch,
+  recent: createRecent(storage),
+  onFocus: (n) => setState({ focus: n.id }, { push: true }), // Enter: replace the Focus node
+  onAdd: async (n) => { // Shift-Enter: add the node's neighborhood to what is on the canvas
+    try {
+      const added = await fetchNeighborhood(n.id, { depth: state.depth, mode: state.mode });
+      if (!added || !lastHood) return;
+      lastHood = mergeGraphs(lastHood, added);
+      $("status").textContent = statusText(lastHood);
+      canvas.show(lastHood);
+    } catch (err) { $("status").textContent = `Error: ${err.message}`; }
+  },
+});
 
 render();

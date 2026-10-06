@@ -219,6 +219,66 @@ class Graph:
         )
         return {"nodes": rows, "edges": edges, "truncated": truncated, "total": total}
 
+    # Tie-break order among equally good matches: types and functions before containers and members.
+    SEARCH_KIND_PRIORITY = ("class", "type", "function", "method", "package", "module",
+                            "file", "variable", "field")
+
+    def search(
+        self,
+        query: str,
+        kinds: list[str] | None = None,
+        languages: list[str] | None = None,
+        limit: int = 20,
+    ) -> dict:
+        """Case-insensitive node search, ranked for type-ahead.
+
+        Matches `name` and `qualified_name` (a file's qualified name is its path, so files
+        match by name only); `file_path` is matched too only when the query contains '/'
+        or '.'. Ranking: exact > prefix > substring (> path-only) match, then kind
+        priority, then degree (edge count, descending). Returns
+        {nodes, total, truncated}; each node dict gains `degree` and `file_count`
+        (number of files that contain it).
+        """
+        q = query.strip().lower()
+        if not q:
+            return {"nodes": [], "total": 0, "truncated": False}
+        esc = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        like_any, like_prefix = f"%{esc}%", f"{esc}%"
+        by_path = "/" in q or "." in q
+        qn = "(CASE WHEN n.kind = 'file' THEN NULL ELSE lower(n.qualified_name) END)"
+        nm = "lower(n.name)"
+        path = "lower(n.file_path)"
+        sub = f"({nm} LIKE ? ESCAPE '\\' OR {qn} LIKE ? ESCAPE '\\')"
+        path_sql = f" OR {path} LIKE ? ESCAPE '\\'" if by_path else ""
+        where = [f"({sub}{path_sql})"]
+        params: list[Any] = [like_any, like_any] + ([like_any] if by_path else [])
+        for col, vals in (("n.kind", kinds), ("n.language", languages)):
+            if vals:
+                where.append(f"{col} IN ({', '.join('?' * len(vals))})")
+                params += list(vals)
+        where_sql = " AND ".join(where)
+        total = self.conn.execute(f"SELECT COUNT(*) FROM nodes n WHERE {where_sql}", params).fetchone()[0]
+        kind_rank = "CASE n.kind " + " ".join(
+            f"WHEN '{k}' THEN {i}" for i, k in enumerate(self.SEARCH_KIND_PRIORITY)
+        ) + f" ELSE {len(self.SEARCH_KIND_PRIORITY)} END"
+        tier = (f"CASE WHEN {nm} = ? OR {qn} = ? THEN 0 "
+                f"WHEN {nm} LIKE ? ESCAPE '\\' OR {qn} LIKE ? ESCAPE '\\' THEN 1 "
+                f"WHEN {sub} THEN 2 ELSE 3 END")
+        tier_params = [q, q, like_prefix, like_prefix, like_any, like_any]
+        rows = self._fetchall(
+            f"SELECT n.*, "
+            f"(SELECT COUNT(*) FROM edges e WHERE e.source_id = n.id OR e.target_id = n.id) AS degree, "
+            f"(SELECT COUNT(DISTINCT e.source_id) FROM edges e JOIN nodes f ON f.id = e.source_id "
+            f" WHERE e.target_id = n.id AND e.kind = 'contains' AND f.kind = 'file') AS file_count, "
+            f"{tier} AS tier "
+            f"FROM nodes n WHERE {where_sql} "
+            f"ORDER BY tier, {kind_rank}, degree DESC, lower(n.qualified_name), n.id LIMIT ?",
+            tier_params + params + [limit],
+        )
+        for r in rows:
+            del r["tier"]
+        return {"nodes": rows, "total": total, "truncated": total > len(rows)}
+
     # Edge kinds that carry impact. All point from dependant to dependency (a calls b, a
     # inherits b), so the Impact set follows them backwards (for inherits: descendants)
     # and Dependencies follow them forwards (for inherits: ancestors).
