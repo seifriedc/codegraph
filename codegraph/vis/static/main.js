@@ -4,6 +4,8 @@ import { fetchHierarchy, fetchNeighborhood, fetchNode, fetchSearch } from "./api
 import { HIERARCHY_MODES } from "./hierarchy_layout.js";
 import { createCanvas } from "./canvas.js";
 import { statusText } from "./elements.js";
+import { defaultFilters, toggleEdgeKind, toggleNodeKind } from "./filters.js";
+import { countKinds, legendModel, miniLegendModel, renderLegend, renderMiniLegend } from "./legend.js";
 import { renderPanel } from "./panel.js";
 import { depthOptions, MODES, ringText } from "./reach.js";
 import { createRecent } from "./recent.js";
@@ -23,6 +25,8 @@ const canvas = createCanvas($("cy"), {
 });
 
 let state = parseHash(location.hash);
+let filters = defaultFilters(); // kind filters (legend); the URL-state ticket persists these via filtersToParams
+let counts = { nodes: {}, edges: {} };
 let lastHood = null; // last graph shown, so Shift-Enter search results can be merged into it
 let requestSeq = 0; // ignore responses that arrive after a newer request
 
@@ -35,6 +39,15 @@ function setState(patch, { push = false } = {}) {
     else history.replaceState(null, "", hash || location.pathname);
   }
   if (!push) render();
+}
+
+function drawLegends() {
+  renderLegend($("legend"), legendModel(filters, counts), {
+    // Filters are client-side visibility toggles (the server's `mode` overrides the `kinds` param).
+    onToggleNode: (k) => { filters = toggleNodeKind(filters, k); canvas.setFilters(filters); drawLegends(); },
+    onToggleEdge: (k) => { filters = toggleEdgeKind(filters, k); canvas.setFilters(filters); drawLegends(); },
+  });
+  renderMiniLegend($("mini-legend"), miniLegendModel(filters, counts));
 }
 
 async function render() {
@@ -63,10 +76,12 @@ async function render() {
       return;
     }
     $("status").textContent = statusText(hood);
+    counts = countKinds(hood);
     lastHood = layered ? null : hood; // Shift-Enter merging only applies to the focus view
     $("rings").textContent = layered ? "" : ringText(hood.ring_counts, state.depth);
     if (layered) canvas.showHierarchy(hood, state.view);
     else canvas.show(hood);
+    drawLegends();
     renderPanel($("panel"), detail);
   } catch (err) {
     if (seq === requestSeq) $("status").textContent = `Error: ${err.message}`;
@@ -81,6 +96,7 @@ $("view").addEventListener("change", (e) => setState({ view: e.target.value }));
 $("recenter").addEventListener("click", () => canvas.recenter());
 addEventListener("hashchange", () => { state = parseHash(location.hash); render(); });
 
+drawLegends();
 let storage;
 try { storage = window.localStorage; } catch { storage = undefined; } // even reading it can throw
 export const search = mountSearch($("search"), {
