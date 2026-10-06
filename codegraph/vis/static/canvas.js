@@ -2,13 +2,15 @@
 // owns the live layout. `cytoscape` and `d3` are injected (vendored UMD globals; see index.html).
 import { toElements } from "./elements.js";
 import { createForceLayout } from "./layout.js";
-import { stylesheet } from "./style.js";
+import { buildStylesheet } from "./style.js";
+import { defaultFilters, isEdgeVisible, isNodeVisible } from "./filters.js";
 
-export function createCanvas(container, { cytoscape, d3, onTapNode = () => {}, onLayoutState = () => {}, cyOptions = {} }) {
+export function createCanvas(container, { cytoscape, d3, onTapNode = () => {}, onLayoutState = () => {}, styleRules = [], cyOptions = {} }) {
   const cy = cytoscape({
-    container, style: stylesheet, wheelSensitivity: 0.3, minZoom: 0.1, maxZoom: 3, ...cyOptions,
+    container, style: buildStylesheet(styleRules), wheelSensitivity: 0.3, minZoom: 0.1, maxZoom: 3, ...cyOptions,
   });
   let autoFit = true;
+  let filters = defaultFilters();
 
   const layout = createForceLayout(cy, d3, {
     onWake: () => onLayoutState("running"),
@@ -24,6 +26,28 @@ export function createCanvas(container, { cytoscape, d3, onTapNode = () => {}, o
   }
 
   cy.on("tap", "node", (evt) => onTapNode(evt.target.id()));
+
+  // Labels are constant on-screen size: re-evaluate the zoom-dependent style functions when zoom changes.
+  let zoomPending = false;
+  cy.on("zoom", () => {
+    if (zoomPending) return;
+    zoomPending = true;
+    requestAnimationFrame(() => { zoomPending = false; cy.nodes().updateStyle(); });
+  });
+
+  // Hover emphasises a node and its neighbours (their labels show even when zoomed out).
+  cy.on("mouseover", "node", (evt) => evt.target.closedNeighborhood().addClass("emphasised"));
+  cy.on("mouseout", "node", () => cy.elements().removeClass("emphasised"));
+
+  /** Apply legend filters as visibility (class `filtered`); the data stays in the graph. */
+  function setFilters(next) {
+    filters = next;
+    cy.batch(() => {
+      cy.nodes().forEach((n) => n.toggleClass("filtered", !isNodeVisible(filters, n.data())));
+      cy.edges().forEach((e) => e.toggleClass("filtered",
+        !isEdgeVisible(filters, e.data(), e.source().data(), e.target().data())));
+    });
+  }
 
   /** Fit all elements in view. Also the "recenter" button's action. */
   function recenter(animate = true) {
@@ -59,6 +83,7 @@ export function createCanvas(container, { cytoscape, d3, onTapNode = () => {}, o
       cy.add(fresh);
     });
 
+    setFilters(filters);
     autoFit = true;
     if (!hadNodes) recenter(false);
     layout.start(resp.focus);
@@ -66,5 +91,5 @@ export function createCanvas(container, { cytoscape, d3, onTapNode = () => {}, o
 
   function destroy() { layout.stop(); cy.destroy(); }
 
-  return { cy, show, recenter, destroy, layout };
+  return { cy, show, recenter, setFilters, destroy, layout };
 }

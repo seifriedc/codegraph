@@ -10,14 +10,27 @@
       --accent: #1d4ed8;
     }
     * { box-sizing: border-box; }
-    body { margin: 0; height: 100vh; display: grid; grid-template-rows: auto 1fr; grid-template-columns: 1fr 300px;
+    body { margin: 0; height: 100vh; display: grid; grid-template-rows: auto 1fr; grid-template-columns: 210px 1fr 300px;
            font: 13px system-ui, sans-serif; background: var(--bg); color: var(--text); }
     header { grid-column: 1 / -1; display: flex; gap: 12px; align-items: center; padding: 6px 12px;
              background: var(--panel-bg); border-bottom: 1px solid var(--border); }
     header h1 { font-size: 14px; margin: 0 8px 0 0; }
     #status { flex: 1; color: var(--muted); }
     #layout-state { color: var(--muted); min-width: 4.5em; }
-    #cy { min-height: 0; position: relative; }
+    #stage { min-height: 0; position: relative; }
+    #cy { position: absolute; inset: 0; }
+    #legend { overflow: auto; padding: 8px 10px; background: var(--panel-bg); border-right: 1px solid var(--border); }
+    #legend h3 { font-size: 12px; text-transform: uppercase; color: var(--muted); margin: 8px 0 4px; }
+    .legend-row { display: flex; align-items: center; gap: 6px; padding: 1px 0; cursor: pointer; }
+    .legend-row.off { opacity: 0.45; }
+    .legend-kind { flex: 1; }
+    .legend-count { color: var(--muted); font-variant-numeric: tabular-nums; }
+    #mini-legend { position: absolute; left: 8px; bottom: 8px; max-height: 60%; overflow: auto; z-index: 5;
+                   background: rgba(255,255,255,0.92); border: 1px solid var(--border); border-radius: 4px;
+                   padding: 4px 8px; font-size: 12px; }
+    #mini-legend:empty { display: none; }
+    #mini-legend summary { cursor: pointer; color: var(--muted); }
+    #mini-legend .legend-row { cursor: default; }
     #panel { overflow: auto; padding: 12px; background: var(--panel-bg); border-left: 1px solid var(--border); }
     #panel h2 { font-size: 15px; margin: 0 0 8px; word-break: break-all; }
     #panel h3 { font-size: 12px; text-transform: uppercase; color: var(--muted); margin: 14px 0 4px; }
@@ -46,7 +59,8 @@
     <span id="layout-state"></span>
     <span id="status">Loading...</span>
   </header>
-  <div id="cy"></div>
+  <aside id="legend"></aside>
+  <div id="stage"><div id="cy"></div><div id="mini-legend"></div></div>
   <aside id="panel"></aside>
 
   <!-- Vendored, pinned libraries (classic scripts: they define window.cytoscape and window.d3). -->

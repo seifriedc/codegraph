@@ -3,6 +3,8 @@
 import { fetchNeighborhood, fetchNode } from "./api.js";
 import { createCanvas } from "./canvas.js";
 import { statusText } from "./elements.js";
+import { defaultFilters, edgeKindsParam, toggleEdgeKind, toggleNodeKind } from "./filters.js";
+import { countKinds, legendModel, miniLegendModel, renderLegend, renderMiniLegend } from "./legend.js";
 import { renderPanel } from "./panel.js";
 import { formatHash, parseHash, MAX_UI_DEPTH } from "./state.js";
 
@@ -17,6 +19,8 @@ const canvas = createCanvas($("cy"), {
 });
 
 let state = parseHash(location.hash);
+let filters = defaultFilters(); // kind filters (legend); the URL-state ticket persists these via filtersToParams
+let counts = { nodes: {}, edges: {} };
 let requestSeq = 0; // ignore responses that arrive after a newer request
 
 function setState(patch, { push = false } = {}) {
@@ -30,6 +34,15 @@ function setState(patch, { push = false } = {}) {
   if (!push) render();
 }
 
+function drawLegends() {
+  renderLegend($("legend"), legendModel(filters, counts), {
+    // node kinds filter client-side only; edge kinds also change the API request
+    onToggleNode: (k) => { filters = toggleNodeKind(filters, k); canvas.setFilters(filters); drawLegends(); },
+    onToggleEdge: (k) => { filters = toggleEdgeKind(filters, k); render(); },
+  });
+  renderMiniLegend($("mini-legend"), miniLegendModel(filters, counts));
+}
+
 async function render() {
   const seq = ++requestSeq;
   $("depth").value = String(state.depth);
@@ -41,7 +54,7 @@ async function render() {
   }
   try {
     const [hood, detail] = await Promise.all([
-      fetchNeighborhood(state.focus, { depth: state.depth, direction: state.direction }),
+      fetchNeighborhood(state.focus, { depth: state.depth, direction: state.direction, kinds: edgeKindsParam(filters) }),
       fetchNode(state.focus),
     ]);
     if (seq !== requestSeq) return;
@@ -51,7 +64,10 @@ async function render() {
       return;
     }
     $("status").textContent = statusText(hood);
+    counts = countKinds(hood);
     canvas.show(hood);
+    canvas.setFilters(filters);
+    drawLegends();
     renderPanel($("panel"), detail);
   } catch (err) {
     if (seq === requestSeq) $("status").textContent = `Error: ${err.message}`;
@@ -64,4 +80,5 @@ $("direction").addEventListener("change", (e) => setState({ direction: e.target.
 $("recenter").addEventListener("click", () => canvas.recenter());
 addEventListener("hashchange", () => { state = parseHash(location.hash); render(); });
 
+drawLegends();
 render();

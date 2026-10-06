@@ -1,4 +1,5 @@
 // API response -> Cytoscape element definitions. Pure (no DOM, no Cytoscape import).
+import { languageBadge } from "./style.js";
 
 /** Short constant-size label: last segment of a qualified name ("Circle::area" -> "area"). */
 export function shortLabel(node) {
@@ -19,6 +20,7 @@ export function toElements(resp) {
       full: n.qualified_name || n.name,
       kind: n.kind,
       language: n.language,
+      badge: languageBadge(n.language),
       external: n.external,
       depth: n.depth,
       isFocus: n.id === resp.focus,
