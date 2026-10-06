@@ -134,7 +134,7 @@ def test_every_script_and_module_the_page_references_is_served(client):
         assert r.status_code == 200, src
         if src.endswith(".js") and not src.startswith("vendor/"):  # follow relative ES imports
             todo += [m[2:] for m in re.findall(r'from "(\./[^"]+)"', r.text)]
-    assert {"api.js", "state.js", "canvas.js", "layout.js", "elements.js", "panel.js", "style.js"} <= seen
+    assert {"api.js", "state.js", "canvas.js", "layout.js", "elements.js", "panel.js", "style.js", "scale.js", "scale-style.js"} <= seen
 
 
 def test_neighbour_counts_match_the_neighborhood_edges(client):

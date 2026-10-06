@@ -29,6 +29,7 @@
     #panel td:nth-child(n+2), #panel th:nth-child(n+2) { text-align: right; }
     .muted { color: var(--muted); }
     button { cursor: pointer; }
+    #warn { background: #fef3c7; border: 1px solid #f59e0b; padding: 2px 8px; border-radius: 4px; }
   </style>
 </head>
 <body>
@@ -43,8 +44,12 @@
       </select>
     </label>
     <button id="recenter" type="button" title="Fit all nodes in view">Recenter</button>
+    <button id="raise-limit" type="button" hidden title="Show more nodes (server maximum 500)"></button>
+    <button id="undo" type="button" disabled title="Undo the last expansion">Undo expand</button>
     <span id="layout-state"></span>
     <span id="status">Loading...</span>
+    <span id="warn" hidden><span id="warn-text"></span>
+      <button id="prune" type="button" title="Drop all expansions, keep the focus neighbourhood">Prune to focus neighbourhood</button></span>
   </header>
   <div id="cy"></div>
   <aside id="panel"></aside>
