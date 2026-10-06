@@ -50,14 +50,9 @@
   <header>
     <h1>codegraph</h1>
     <div id="search" class="search"></div>
+    <label>Show <select id="mode"></select></label>
     <label>Depth <select id="depth"></select></label>
-    <label>Direction
-      <select id="direction">
-        <option value="both">both</option>
-        <option value="in">in (impact)</option>
-        <option value="out">out (dependencies)</option>
-      </select>
-    </label>
+    <span id="rings" class="muted" title="Nodes per ring (distance from the focus)"></span>
     <button id="recenter" type="button" title="Fit all nodes in view">Recenter</button>
     <span id="layout-state"></span>
     <span id="status">Loading...</span>

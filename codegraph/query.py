@@ -279,6 +279,49 @@ class Graph:
             del r["tier"]
         return {"nodes": rows, "total": total, "truncated": total > len(rows)}
 
+    # Edge kinds that carry impact. All point from dependant to dependency (a calls b, a
+    # inherits b), so the Impact set follows them backwards (for inherits: descendants)
+    # and Dependencies follow them forwards (for inherits: ancestors).
+    REACH_KINDS = ["calls", "references", "instantiates", "inherits"]
+
+    def reach(self, node_id: str, mode: str = "both", depth: int = 2,
+              limit: int | None = None) -> dict | None:
+        """The Impact set ('impact'), the Dependencies ('dependencies') or their union ('both').
+
+        Same result shape as `neighborhood`, plus `ring_counts` {depth: untruncated node
+        count} for depth >= 1. In 'both' mode the two sets are expanded independently
+        (callers of callees are not included) and merged, keeping the smaller depth.
+        """
+        directions = {"impact": ["in"], "dependencies": ["out"], "both": ["in", "out"]}[mode]
+        parts = [self.neighborhood(node_id, direction=d, depth=depth,
+                                   edge_kinds=self.REACH_KINDS) for d in directions]
+        if parts[0] is None:
+            return None
+        nodes: dict[str, dict] = {}
+        for p in parts:
+            for n in p["nodes"]:
+                if n["id"] not in nodes or n["depth"] < nodes[n["id"]]["depth"]:
+                    nodes[n["id"]] = n
+        rows = sorted(nodes.values(),
+                      key=lambda r: (r["depth"], r["qualified_name"] or r["name"], r["id"]))
+        ring_counts: dict[int, int] = {}
+        for r in rows:
+            if r["depth"] >= 1:
+                ring_counts[r["depth"]] = ring_counts.get(r["depth"], 0) + 1
+        total = len(rows)
+        truncated = limit is not None and total > limit
+        if truncated:
+            rows = rows[:limit]
+        kept = {r["id"] for r in rows}
+        return {
+            "nodes": rows,
+            "edges": self._fetchall(
+                "SELECT * FROM edges WHERE source_id IN (SELECT unnest(?)) "
+                "AND target_id IN (SELECT unnest(?)) AND kind IN (SELECT unnest(?)) ORDER BY id",
+                [list(kept), list(kept), self.REACH_KINDS]),
+            "truncated": truncated, "total": total, "ring_counts": ring_counts,
+        }
+
     def neighbour_counts(self, node_id: str) -> dict[str, dict[str, int]]:
         """Distinct neighbour nodes per edge kind, split by direction: {"in": {...}, "out": {...}}."""
         out: dict[str, dict[str, int]] = {"in": {}, "out": {}}

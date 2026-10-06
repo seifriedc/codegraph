@@ -40,6 +40,8 @@ class NeighborhoodResponse(BaseModel):
     edges: list[VisEdge]
     truncated: bool
     total: int
+    # Untruncated node count per BFS ring ({"1": n, ...}); only set in impact/dependencies mode.
+    ring_counts: dict[int, int] | None = None
 
 
 class NodeDetail(VisNode):

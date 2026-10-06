@@ -8,12 +8,13 @@ async function getJson(url, fetchImpl) {
 }
 
 /** GET /api/neighborhood/{id}. Returns {focus, nodes, edges, truncated, total}, or null if the node is unknown. */
-export function fetchNeighborhood(focus, { depth, direction, kinds, limit } = {}, fetchImpl = fetch) {
+export function fetchNeighborhood(focus, { depth, direction, kinds, limit, mode } = {}, fetchImpl = fetch) {
   const p = new URLSearchParams();
   if (depth != null) p.set("depth", depth);
   if (direction) p.set("direction", direction);
   if (kinds && kinds.length) p.set("kinds", kinds.join(","));
   if (limit != null) p.set("limit", limit);
+  if (mode) p.set("mode", mode); // "impact" | "dependencies" | "both": overrides direction and kinds
   const q = p.toString();
   return getJson(`/api/neighborhood/${encodeURIComponent(focus)}${q ? "?" + q : ""}`, fetchImpl);
 }

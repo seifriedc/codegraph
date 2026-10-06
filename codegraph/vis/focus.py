@@ -33,16 +33,22 @@ def register(app: FastAPI, get_graph: Callable, rel: Callable[[str | None], str 
         depth: int = Query(1, ge=0, le=MAX_DEPTH),
         kinds: str | None = Query(None, description="comma-separated edge kinds"),
         limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+        mode: Literal["impact", "dependencies", "both"] | None = Query(
+            None, description="Impact set / Dependencies / both; overrides direction and kinds"),
         g: Graph = Depends(get_graph),
     ) -> dict:
         focus = g.resolve_node(node_id)
         if focus is None:
             raise HTTPException(404, f"node not found: {node_id}")
-        edge_kinds = [k for k in kinds.split(",") if k] if kinds else None
-        r = g.neighborhood(focus["id"], direction=direction, depth=depth,
-                           edge_kinds=edge_kinds, limit=limit)
+        if mode:
+            r = g.reach(focus["id"], mode=mode, depth=depth, limit=limit)
+        else:
+            edge_kinds = [k for k in kinds.split(",") if k] if kinds else None
+            r = g.neighborhood(focus["id"], direction=direction, depth=depth,
+                               edge_kinds=edge_kinds, limit=limit)
         return {
             "focus": focus["id"],
+            "ring_counts": r.get("ring_counts"),
             "nodes": [shape_node(n, rel) for n in r["nodes"]],
             "edges": [VisEdge(**{k: e[k] for k in ("id", "kind", "source_id", "target_id")}) for e in r["edges"]],
             "truncated": r["truncated"],
