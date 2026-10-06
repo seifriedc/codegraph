@@ -111,10 +111,12 @@ def _walk(
     current_qname = parent_qname
 
     if ts_node.type in ("package_declaration", "package_body"):
-        full_name, _ = _first_name(ts_node, source)
+        full_name, is_qualified = _first_name(ts_node, source)
         if full_name:
-            qname = full_name  # always fully qualified (e.g. "Outer.Inner")
-            name = full_name.split(".")[-1]
+            # Dotted names (child units) are already fully qualified; a simple name
+            # nested inside another package inherits the enclosing package's scope.
+            qname = full_name if is_qualified or not parent_qname else f"{parent_qname}.{full_name}"
+            name = qname.split(".")[-1]
             n = Node(
                 id=stable_id(f"package:ada:{qname}"),
                 kind="package",
@@ -127,6 +129,14 @@ def _walk(
             )
             nodes.append(n)
             edges.append(contains_edge(parent, n, file_path, ts_node))
+            # Package nesting: parent package contains child package (ADR 0001).
+            # Physical nesting already has the parent package as `parent`; child
+            # units (Geometry.Utils) are parented by the name prefix.
+            if "." in qname and parent.kind != "package":
+                parent_pkg_name = qname.rsplit(".", 1)[0]
+                parent_pkg = external_node(parent_pkg_name, "ada", "package")
+                nodes.append(parent_pkg)
+                edges.append(contains_edge(parent_pkg, n, file_path, ts_node))
             current = n
             current_qname = qname
 
