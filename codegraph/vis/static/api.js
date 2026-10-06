@@ -18,6 +18,13 @@ export function fetchNeighborhood(focus, { depth, direction, kinds, limit } = {}
   return getJson(`/api/neighborhood/${encodeURIComponent(focus)}${q ? "?" + q : ""}`, fetchImpl);
 }
 
+/** GET /api/hierarchy/{id}?mode=type|declaration. Same response shape as neighborhood; null if unknown. */
+export function fetchHierarchy(focus, { mode, limit } = {}, fetchImpl = fetch) {
+  const p = new URLSearchParams({ mode });
+  if (limit != null) p.set("limit", limit);
+  return getJson(`/api/hierarchy/${encodeURIComponent(focus)}?${p}`, fetchImpl);
+}
+
 /** GET /api/node/{id}. Returns the node detail, or null if the node is unknown. */
 export function fetchNode(id, fetchImpl = fetch) {
   return getJson(`/api/node/${encodeURIComponent(id)}`, fetchImpl);

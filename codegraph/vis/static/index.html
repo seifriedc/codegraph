@@ -34,6 +34,13 @@
 <body>
   <header>
     <h1>codegraph</h1>
+    <label>View
+      <select id="mode">
+        <option value="focus">focus</option>
+        <option value="type">type hierarchy</option>
+        <option value="declaration">declaration hierarchy</option>
+      </select>
+    </label>
     <label>Depth <select id="depth"></select></label>
     <label>Direction
       <select id="direction">
@@ -55,6 +62,7 @@
   <script src="vendor/d3-quadtree.min.js"></script>
   <script src="vendor/d3-timer.min.js"></script>
   <script src="vendor/d3-force.min.js"></script>
+  <script src="vendor/dagre.min.js"></script>
   <script type="module" src="main.js"></script>
 </body>
 </html>

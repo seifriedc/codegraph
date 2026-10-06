@@ -1,7 +1,8 @@
 // View state <-> URL hash. Pure (no DOM): the URL is the source of truth for view state.
 // Other views add their own keys here (mode, kinds, group-by, ...); unknown keys are ignored.
 
-export const DEFAULTS = Object.freeze({ depth: 2, direction: "both" });
+export const DEFAULTS = Object.freeze({ depth: 2, direction: "both", mode: "focus" });
+export const MODES = ["focus", "type", "declaration"]; // other views append theirs here
 export const MAX_UI_DEPTH = 5;
 export const DIRECTIONS = ["both", "in", "out"];
 
@@ -14,6 +15,7 @@ export function parseHash(hash) {
     focus: p.get("focus") || null,
     depth: depth >= 1 && depth <= MAX_UI_DEPTH ? depth : DEFAULTS.depth,
     direction: DIRECTIONS.includes(direction) ? direction : DEFAULTS.direction,
+    mode: MODES.includes(p.get("mode")) ? p.get("mode") : DEFAULTS.mode,
   };
 }
 
@@ -23,6 +25,7 @@ export function formatHash(state) {
   if (state.focus) p.set("focus", state.focus);
   if (state.depth !== DEFAULTS.depth) p.set("depth", String(state.depth));
   if (state.direction !== DEFAULTS.direction) p.set("direction", state.direction);
+  if (state.mode && state.mode !== DEFAULTS.mode) p.set("mode", state.mode);
   const s = p.toString();
   return s ? "#" + s : "";
 }

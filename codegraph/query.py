@@ -219,6 +219,18 @@ class Graph:
         )
         return {"nodes": rows, "edges": edges, "truncated": truncated, "total": total}
 
+    def edges_among(self, node_ids: list[str], edge_kinds: list[str] | None = None) -> list[dict]:
+        """Every edge whose source and target are both in `node_ids` (optionally of the given kinds)."""
+        kind_sql, kind_params = "", []
+        if edge_kinds:
+            kind_sql = f"AND e.kind IN ({', '.join('?' * len(edge_kinds))})"
+            kind_params = list(edge_kinds)
+        return self._fetchall(
+            f"SELECT * FROM edges e WHERE e.source_id IN (SELECT unnest(?)) "
+            f"AND e.target_id IN (SELECT unnest(?)) {kind_sql} ORDER BY e.id",
+            [node_ids, node_ids, *kind_params],
+        )
+
     def neighbour_counts(self, node_id: str) -> dict[str, dict[str, int]]:
         """Distinct neighbour nodes per edge kind, split by direction: {"in": {...}, "out": {...}}."""
         out: dict[str, dict[str, int]] = {"in": {}, "out": {}}
