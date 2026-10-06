@@ -17,10 +17,16 @@ const { createForceLayout, SETTLE } = await load("layout.js");
 const { fetchNeighborhood } = await load("api.js");
 
 test("state round-trips and omits defaults", () => {
-  const s = { ...DEFAULTS, focus: "Shape", depth: 3, direction: "in", mode: "both", view: "focus" };
+  const s = { ...DEFAULTS, focus: "Shape", depth: 3, direction: "in", mode: "both", view: "focus", limit: 300 };
   assert.deepEqual(parseHash(formatHash(s)), s);
   assert.equal(formatHash({ ...DEFAULTS, focus: "x", view: "focus" }), "#focus=x");
   assert.equal(formatHash({ ...DEFAULTS, focus: null, view: "overview" }), "");
+});
+
+test("state round-trips every hash key together", () => {
+  const s = { focus: "Shape", depth: 4, direction: "out", mode: "impact", view: "type", limit: 400,
+    expanded: ["g1", "g2"], okinds: ["imports", "calls"], groupBy: "directory" };
+  assert.deepEqual(parseHash(formatHash(s)), s);
 });
 
 test("state falls back to defaults on junk", () => {

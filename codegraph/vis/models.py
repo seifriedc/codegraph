@@ -33,11 +33,25 @@ class VisEdge(BaseModel):
     target_id: str
 
 
+class VisStub(BaseModel):
+    """Stub node: stands for `hidden` neighbours of `owner` (one edge kind and direction).
+
+    `offset` is how many of that group are already shown; pass it to /api/expand to page in more.
+    """
+    id: str
+    owner: str
+    direction: str  # "in" | "out"
+    kind: str  # edge kind
+    hidden: int
+    offset: int
+
+
 class NeighborhoodResponse(BaseModel):
     """Shared graph-response shape: nodes, edges, truncated, total (plus the focus id)."""
     focus: str
     nodes: list[VisNode]
     edges: list[VisEdge]
+    stubs: list[VisStub] = []
     truncated: bool
     total: int
     # Untruncated node count per BFS ring ({"1": n, ...}); only set in impact/dependencies mode.
@@ -76,6 +90,15 @@ class NodeDetail(VisNode):
     defining_files: list[str]
     # distinct neighbour nodes per edge kind: {"in": {kind: n}, "out": {kind: n}}
     neighbour_counts: dict[str, dict[str, int]]
+
+
+class ExpandResponse(BaseModel):
+    """One page of a Stub node's hidden neighbours; `stub` is the continuation, null on the last page."""
+    owner: str
+    nodes: list[VisNode]  # depth is 1 relative to the owner
+    edges: list[VisEdge]  # edges between the owner and the page
+    stub: VisStub | None
+    total: int
 
 
 class SearchHit(VisNode):

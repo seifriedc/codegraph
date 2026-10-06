@@ -6,8 +6,10 @@
 // Overview-only keys: `expanded` (repeated `expanded=<group id>`), `okinds` (edge kinds; absent = server
 // default, which leaves `calls` off), `groupby` ("directory"; ticket 25 appends "package" to GROUP_BYS).
 
+import { BUDGET, clampLimit } from "./scale.js";
+
 export const DEFAULTS = Object.freeze({
-  depth: 2, direction: "both", mode: "both", view: "focus",
+  depth: 2, direction: "both", mode: "both", view: "focus", limit: BUDGET.defaultLimit,
   expanded: Object.freeze([]), okinds: null, groupBy: "directory",
 });
 export const MAX_UI_DEPTH = 5;
@@ -27,6 +29,7 @@ export function parseHash(hash) {
   const rawDepth = p.get("depth");
   const depth = rawDepth === "all" ? ALL_DEPTH : Number.parseInt(rawDepth, 10);
   const direction = p.get("direction");
+  const limit = p.has("limit") ? clampLimit(Number.parseInt(p.get("limit"), 10)) : DEFAULTS.limit;
   const mode = p.get("mode");
   const groupBy = p.get("groupby");
   const focus = p.get("focus") || null;
@@ -34,6 +37,7 @@ export function parseHash(hash) {
     focus,
     depth: (depth >= 1 && depth <= MAX_UI_DEPTH) || depth === ALL_DEPTH ? depth : DEFAULTS.depth,
     direction: DIRECTIONS.includes(direction) ? direction : DEFAULTS.direction,
+    limit,
     mode: MODES.includes(mode) ? mode : DEFAULTS.mode,
     view: VIEWS.includes(p.get("view")) ? p.get("view") : derivedView(focus),
     expanded: p.getAll("expanded"),
@@ -48,6 +52,7 @@ export function formatHash(state) {
   if (state.focus) p.set("focus", state.focus);
   if (state.depth !== DEFAULTS.depth) p.set("depth", state.depth === ALL_DEPTH ? "all" : String(state.depth));
   if (state.direction !== DEFAULTS.direction) p.set("direction", state.direction);
+  if (state.limit != null && state.limit !== DEFAULTS.limit) p.set("limit", String(clampLimit(state.limit)));
   if (state.mode !== DEFAULTS.mode) p.set("mode", state.mode);
   if (state.view && state.view !== derivedView(state.focus)) p.set("view", state.view);
   for (const id of state.expanded || []) p.append("expanded", id);
