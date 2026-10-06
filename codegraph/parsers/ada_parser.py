@@ -4,10 +4,16 @@ from pathlib import Path
 from tree_sitter import Language, Parser, Node as TSNode
 import tree_sitter_ada
 
-from codegraph.models import Node, Edge, stable_id, random_id
+from codegraph.models import Node, Edge, stable_id
 from codegraph.parsers.base import (
-    make_file_node, node_text, contains_edge,
-    imports_edge, calls_edge, inherits_edge, references_edge, external_node,
+    make_file_node,
+    node_text,
+    contains_edge,
+    imports_edge,
+    calls_edge,
+    inherits_edge,
+    references_edge,
+    external_node,
 )
 
 _LANGUAGE = Language(tree_sitter_ada.language())
@@ -15,10 +21,15 @@ _PARSER = Parser(_LANGUAGE)
 
 # Containers we recurse through without creating a node
 _TRANSPARENT = {
-    "compilation", "compilation_unit",
-    "non_empty_declarative_part", "declarative_part",
-    "handled_sequence_of_statements", "sequence_of_statements",
-    "record_definition", "record_extension_part", "component_list",
+    "compilation",
+    "compilation_unit",
+    "non_empty_declarative_part",
+    "declarative_part",
+    "handled_sequence_of_statements",
+    "sequence_of_statements",
+    "record_definition",
+    "record_extension_part",
+    "component_list",
 }
 
 
@@ -147,8 +158,10 @@ def _walk(
             if raw_name:
                 # Already-qualified names (e.g. library-unit body "function Pkg.Foo")
                 # must not be prefixed again; simple names inherit parent scope.
-                qname = raw_name if is_qualified else (
-                    f"{parent_qname}.{raw_name}" if parent_qname else raw_name
+                qname = (
+                    raw_name
+                    if is_qualified
+                    else (f"{parent_qname}.{raw_name}" if parent_qname else raw_name)
                 )
                 name = raw_name.split(".")[-1]
                 kind = "function"  # covers both Ada functions and procedures
@@ -251,7 +264,7 @@ def _walk(
         # First identifier/selected_component is the field's type
         name_child = next(
             (c for c in ts_node.named_children if c.type in ("identifier", "selected_component")),
-            None
+            None,
         )
         if name_child:
             _emit_type_ref(name_child, current, current_qname, file_path, nodes, edges, source)
@@ -271,7 +284,7 @@ def _walk(
         # Single child is the return type
         name_child = next(
             (c for c in ts_node.named_children if c.type in ("identifier", "selected_component")),
-            None
+            None,
         )
         if name_child:
             _emit_type_ref(name_child, current, current_qname, file_path, nodes, edges, source)
@@ -281,8 +294,10 @@ def _walk(
         raw_name, is_qualified = _first_name(ts_node, source)
         if raw_name:
             name = raw_name.split(".")[-1]
-            qname = raw_name if is_qualified else (
-                f"{parent_qname}.{raw_name}" if parent_qname else raw_name
+            qname = (
+                raw_name
+                if is_qualified
+                else (f"{parent_qname}.{raw_name}" if parent_qname else raw_name)
             )
             n = Node(
                 id=stable_id(f"package:ada:{qname}"),
@@ -300,14 +315,16 @@ def _walk(
             for i, child in enumerate(ts_node.named_children):
                 if i > 0 and child.type in ("identifier", "selected_component"):
                     generic_id = stable_id(f"package:ada:{_selected_name(child, source)}")
-                    edges.append(Edge(
-                        kind="instantiates",
-                        source_id=n.id,
-                        target_id=generic_id,
-                        file_path=file_path,
-                        line=ts_node.start_point[0] + 1,
-                        col=ts_node.start_point[1],
-                    ))
+                    edges.append(
+                        Edge(
+                            kind="instantiates",
+                            source_id=n.id,
+                            target_id=generic_id,
+                            file_path=file_path,
+                            line=ts_node.start_point[0] + 1,
+                            col=ts_node.start_point[1],
+                        )
+                    )
                     break
 
     for child in ts_node.named_children:

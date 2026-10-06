@@ -1,4 +1,5 @@
 """The prebuilt UI bundle must ship inside the built wheel."""
+
 from __future__ import annotations
 import os
 import re

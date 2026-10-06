@@ -1,4 +1,5 @@
 """`codegraph serve` command: help text, and a real server process answering HTTP."""
+
 from __future__ import annotations
 import socket
 import subprocess
@@ -12,7 +13,8 @@ from codegraph.cli import app
 
 
 def test_serve_is_documented_in_cli_help():
-    runner = CliRunner()
+    # Plain help output: FORCE_COLOR in the caller's env would wrap options in ANSI codes.
+    runner = CliRunner(env={"NO_COLOR": "1", "FORCE_COLOR": None})
     top = runner.invoke(app, ["--help"])
     assert "serve" in top.output
     result = runner.invoke(app, ["serve", "--help"])
@@ -52,9 +54,18 @@ def _wait_until_listening(proc: subprocess.Popen, port: int, timeout: float = 30
 def test_serve_process_answers_root_and_stats(indexed_db):
     port = _free_port()
     proc = subprocess.Popen(
-        [sys.executable, "-c", "from codegraph.cli import app; app()", "serve",
-         "--db", str(indexed_db), "--port", str(port)],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        [
+            sys.executable,
+            "-c",
+            "from codegraph.cli import app; app()",
+            "serve",
+            "--db",
+            str(indexed_db),
+            "--port",
+            str(port),
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
     try:
         base = f"http://127.0.0.1:{port}"

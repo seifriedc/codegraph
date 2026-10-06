@@ -1,4 +1,5 @@
 """Stub node expansion endpoint: /api/expand/{id} pages in a node's hidden neighbors."""
+
 from __future__ import annotations
 
 from typing import Callable, Literal
@@ -27,8 +28,14 @@ def register(app: FastAPI, get_graph: Callable, rel: Rel) -> None:
         shown = offset + len(page["nodes"])
         stub = None
         if page["hidden"]:
-            stub = VisStub(id=stub_id(owner["id"], direction, kind), owner=owner["id"],
-                           direction=direction, kind=kind, hidden=page["hidden"], offset=shown)
+            stub = VisStub(
+                id=stub_id(owner["id"], direction, kind),
+                owner=owner["id"],
+                direction=direction,
+                kind=kind,
+                hidden=page["hidden"],
+                offset=shown,
+            )
         return {
             "owner": owner["id"],
             "nodes": [shape_node(n, rel) for n in page["nodes"]],

@@ -76,10 +76,7 @@ class TestQueryFiles:
         assert any("Translate" in n for n in names)
 
     def test_captures_dict_populated(self):
-        pattern = (
-            "(subprogram_body"
-            " (function_specification (identifier) @name)) @body"
-        )
+        pattern = "(subprogram_body (function_specification (identifier) @name)) @body"
         matches = list(query_files(pattern, [ADA_FILE]))
         assert matches
         first = matches[0]
@@ -149,8 +146,19 @@ class TestResolveFiles:
     def test_ignores_unsupported_extensions(self):
         files = resolve_files(FIXTURES, None)
         for f in files:
-            assert f.suffix in (".adb", ".ads", ".c", ".h", ".cc", ".cpp",
-                                ".cxx", ".hh", ".hpp", ".hxx", ".py")
+            assert f.suffix in (
+                ".adb",
+                ".ads",
+                ".c",
+                ".h",
+                ".cc",
+                ".cpp",
+                ".cxx",
+                ".hh",
+                ".hpp",
+                ".hxx",
+                ".py",
+            )
 
     def test_nonexistent_db_falls_back_to_walk(self, tmp_path):
         files = resolve_files(FIXTURES, tmp_path / "no.db")
@@ -164,57 +172,103 @@ class TestResolveFiles:
 
 class TestCliQuery:
     def test_basic_query(self):
-        result = runner.invoke(app, [
-            "ast", "query", "(subprogram_body) @fn", str(FIXTURES),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "ast",
+                "query",
+                "(subprogram_body) @fn",
+                str(FIXTURES),
+            ],
+        )
         assert result.exit_code == 0
         assert "geometry.adb" in result.output
         assert "@fn" in result.output
 
     def test_cross_language_query(self):
-        result = runner.invoke(app, [
-            "ast", "query", "(function_definition) @fn", str(FIXTURES),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "ast",
+                "query",
+                "(function_definition) @fn",
+                str(FIXTURES),
+            ],
+        )
         assert result.exit_code == 0
         assert "math_utils.c" in result.output
         assert "shapes.cpp" in result.output
 
     def test_language_filter(self):
-        result = runner.invoke(app, [
-            "ast", "query", "(function_definition) @fn", str(FIXTURES),
-            "--language", "c",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "ast",
+                "query",
+                "(function_definition) @fn",
+                str(FIXTURES),
+                "--language",
+                "c",
+            ],
+        )
         assert result.exit_code == 0
         assert "math_utils.c" in result.output
         assert "shapes.cpp" not in result.output
 
     def test_json_output(self):
         import json
-        result = runner.invoke(app, [
-            "ast", "query", "(subprogram_body) @fn", str(FIXTURES), "--json",
-        ])
+
+        result = runner.invoke(
+            app,
+            [
+                "ast",
+                "query",
+                "(subprogram_body) @fn",
+                str(FIXTURES),
+                "--json",
+            ],
+        )
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert isinstance(data, list)
         assert all("file" in item and "captures" in item for item in data)
 
     def test_verbose_shows_skip_messages(self, capsys):
-        result = runner.invoke(app, [
-            "ast", "query", "(subprogram_body) @fn", str(FIXTURES), "--verbose",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "ast",
+                "query",
+                "(subprogram_body) @fn",
+                str(FIXTURES),
+                "--verbose",
+            ],
+        )
         assert result.exit_code == 0
         assert "[skip" in result.output
 
     def test_no_files_exits_nonzero(self, tmp_path):
-        result = runner.invoke(app, [
-            "ast", "query", "(subprogram_body) @fn", str(tmp_path),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "ast",
+                "query",
+                "(subprogram_body) @fn",
+                str(tmp_path),
+            ],
+        )
         assert result.exit_code == 1
 
     def test_unknown_node_type_exits_nonzero(self):
-        result = runner.invoke(app, [
-            "ast", "query", "(defining_identifier) @x", str(FIXTURES),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "ast",
+                "query",
+                "(defining_identifier) @x",
+                str(FIXTURES),
+            ],
+        )
         assert result.exit_code == 1
         assert "rejected" in result.output.lower() or "error" in result.output.lower()
 
@@ -228,6 +282,7 @@ class TestReadPattern:
     def test_single_line_balanced(self):
         from codegraph.ast_query import _read_pattern
         from unittest.mock import patch
+
         with patch("builtins.input", return_value="(subprogram_body) @fn"):
             result = _read_pattern()
         assert result == "(subprogram_body) @fn"
@@ -235,10 +290,13 @@ class TestReadPattern:
     def test_multiline_unbalanced_accumulates(self):
         from codegraph.ast_query import _read_pattern
         from unittest.mock import patch
-        inputs = iter([
-            "(subprogram_body",
-            "(function_specification) @spec) @fn",
-        ])
+
+        inputs = iter(
+            [
+                "(subprogram_body",
+                "(function_specification) @spec) @fn",
+            ]
+        )
         with patch("builtins.input", side_effect=inputs):
             result = _read_pattern()
         assert result == "(subprogram_body (function_specification) @spec) @fn"
@@ -246,6 +304,7 @@ class TestReadPattern:
     def test_meta_command_not_continued(self):
         from codegraph.ast_query import _read_pattern
         from unittest.mock import patch
+
         with patch("builtins.input", return_value=":help"):
             result = _read_pattern()
         assert result == ":help"
@@ -253,22 +312,26 @@ class TestReadPattern:
     def test_eof_returns_none(self):
         from codegraph.ast_query import _read_pattern
         from unittest.mock import patch
+
         with patch("builtins.input", side_effect=EOFError):
             result = _read_pattern()
         assert result is None
 
     def test_multiline_consolidated_in_readline_history(self):
-        from codegraph.ast_query import _read_pattern
         from unittest.mock import patch, MagicMock
 
         fake_rl = MagicMock()
         fake_rl.get_current_history_length.side_effect = [2, 4]  # before=2, after=4 (2 lines added)
         inputs = iter(["(subprogram_body", "(identifier) @name) @fn"])
 
-        with patch("builtins.input", side_effect=inputs), \
-             patch.dict("sys.modules", {"readline": fake_rl}):
+        with (
+            patch("builtins.input", side_effect=inputs),
+            patch.dict("sys.modules", {"readline": fake_rl}),
+        ):
             # Re-import so the patched readline is picked up inside _read_pattern
-            import importlib, codegraph.ast_query as m
+            import importlib
+            import codegraph.ast_query as m
+
             importlib.reload(m)
             result = m._read_pattern()
 

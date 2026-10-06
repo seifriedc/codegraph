@@ -1,4 +1,5 @@
 """Integration tests at the HTTP seam: /api/search (ranking, filters, cap, path match)."""
+
 from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
@@ -24,7 +25,16 @@ def test_response_has_shared_graph_shape_with_total_and_truncated(client):
     assert set(body) == {"nodes", "total", "truncated"}
     assert body["truncated"] is False and body["total"] == len(body["nodes"])
     hit = body["nodes"][0]
-    assert {"id", "kind", "name", "qualified_name", "path", "language", "external", "more_paths"} <= set(hit)
+    assert {
+        "id",
+        "kind",
+        "name",
+        "qualified_name",
+        "path",
+        "language",
+        "external",
+        "more_paths",
+    } <= set(hit)
 
 
 def test_matching_is_case_insensitive(client):
@@ -53,7 +63,10 @@ def test_kind_and_language_filters(client):
     assert {n["language"] for n in search(client, "Shape", languages="ada")["nodes"]} == {"ada"}
     body = search(client, "Shape", kinds="class,type", languages="cpp")
     assert body["nodes"]
-    assert {(n["kind"], n["language"]) for n in body["nodes"]} <= {("class", "cpp"), ("type", "cpp")}
+    assert {(n["kind"], n["language"]) for n in body["nodes"]} <= {
+        ("class", "cpp"),
+        ("type", "cpp"),
+    }
 
 
 def test_path_match_only_when_query_contains_slash_or_dot(client):

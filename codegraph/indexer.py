@@ -1,7 +1,6 @@
 from __future__ import annotations
 from pathlib import Path
 
-import duckdb
 
 from codegraph.db import connect, insert_nodes, insert_edges
 from codegraph.models import Node, Edge, stable_id, random_id
@@ -41,6 +40,7 @@ class Indexer:
         parser_fn = dispatch.get(language)
         if parser_fn is None:
             from codegraph.parsers.base import make_file_node
+
             return [make_file_node(path, language)], []
         return parser_fn(path)
 
@@ -80,13 +80,21 @@ class Indexer:
         line: int | None = None,
         col: int | None = None,
     ) -> str:
-        e = Edge(kind=kind, source_id=source_id, target_id=target_id, id=random_id(),
-                 file_path=file_path, line=line, col=col)
+        e = Edge(
+            kind=kind,
+            source_id=source_id,
+            target_id=target_id,
+            id=random_id(),
+            file_path=file_path,
+            line=line,
+            col=col,
+        )
         insert_edges(self.conn, [e])
         return e.id
 
     def update_node_metadata(self, node_id: str, metadata: dict) -> None:
         import json
+
         self.conn.execute(
             "UPDATE nodes SET metadata = ? WHERE id = ?",
             (json.dumps(metadata), node_id),

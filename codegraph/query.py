@@ -91,8 +91,13 @@ class _Grouping:
 class Graph:
     """Read-only query interface over an indexed codegraph database."""
 
-    def __init__(self, db_path: str | Path | None = None, read_only: bool = False, *,
-                 conn: duckdb.DuckDBPyConnection | None = None):
+    def __init__(
+        self,
+        db_path: str | Path | None = None,
+        read_only: bool = False,
+        *,
+        conn: duckdb.DuckDBPyConnection | None = None,
+    ):
         """Open `db_path`, or wrap an already open connection `conn` (see `cursor`)."""
         self.conn = conn if conn is not None else connect(db_path, read_only=read_only)
 
@@ -112,8 +117,12 @@ class Graph:
         absolute and relative paths). The one definition of the root that Overview Group
         ids and the vis layer's relative display paths are measured from.
         """
-        dirs = [os.path.dirname(r[0]) for r in self.conn.execute(
-            "SELECT DISTINCT file_path FROM nodes WHERE kind = 'file' AND file_path IS NOT NULL").fetchall()]
+        dirs = [
+            os.path.dirname(r[0])
+            for r in self.conn.execute(
+                "SELECT DISTINCT file_path FROM nodes WHERE kind = 'file' AND file_path IS NOT NULL"
+            ).fetchall()
+        ]
         if not dirs:
             return None
         try:
@@ -154,7 +163,9 @@ class Graph:
         """
         rows = self._fetchall(
             f"SELECT * FROM nodes WHERE qualified_name = ? "
-            f"ORDER BY {self._kind_rank_sql('kind')}, language, id LIMIT 1", [qualified_name])
+            f"ORDER BY {self._kind_rank_sql('kind')}, language, id LIMIT 1",
+            [qualified_name],
+        )
         return rows[0] if rows else None
 
     def node_by_name(self, name: str) -> list[dict]:
@@ -166,11 +177,15 @@ class Graph:
 
     def edges_from(self, node_id: str, kinds: list[str] | None = None) -> list[dict]:
         kind_sql, kind_params = self._kind_clause(kinds, "kind")
-        return self._fetchall(f"SELECT * FROM edges WHERE source_id = ? {kind_sql}", [node_id, *kind_params])
+        return self._fetchall(
+            f"SELECT * FROM edges WHERE source_id = ? {kind_sql}", [node_id, *kind_params]
+        )
 
     def edges_to(self, node_id: str, kinds: list[str] | None = None) -> list[dict]:
         kind_sql, kind_params = self._kind_clause(kinds, "kind")
-        return self._fetchall(f"SELECT * FROM edges WHERE target_id = ? {kind_sql}", [node_id, *kind_params])
+        return self._fetchall(
+            f"SELECT * FROM edges WHERE target_id = ? {kind_sql}", [node_id, *kind_params]
+        )
 
     # ── Traversal ─────────────────────────────────────────────────────────────
 
@@ -202,9 +217,7 @@ class Graph:
         """
         return self._fetchall(sql, [node_id, max_depth, *kind_params, node_id])
 
-    def transitive(
-        self, node_id: str, edge_kind: str, direction: str = "out"
-    ) -> list[dict]:
+    def transitive(self, node_id: str, edge_kind: str, direction: str = "out") -> list[dict]:
         """Full transitive closure along a single edge kind."""
         return self.traverse(node_id, edge_kinds=[edge_kind], direction=direction, max_depth=999)
 
@@ -235,8 +248,15 @@ class Graph:
         directions = ["out", "in"] if direction == "both" else [direction]
         return [(d, *_DIRECTION_COLS[d]) for d in directions]
 
-    def _walk(self, node_id: str, direction: str, depth: int, edge_kinds: list[str] | None,
-              limit: int | None, per_node_cap: int | None) -> dict:
+    def _walk(
+        self,
+        node_id: str,
+        direction: str,
+        depth: int,
+        edge_kinds: list[str] | None,
+        limit: int | None,
+        per_node_cap: int | None,
+    ) -> dict:
         """Breadth-first walk with the node budget applied as it goes.
 
         Rings are filled in order and the walk stops as soon as a ring does not fit the
@@ -258,10 +278,20 @@ class Graph:
             if not frontier:
                 break
             found: dict[str, str] = {}
-            for (owner, dirn, kind), nbs in sorted(self._ranked_groups(frontier, steps, kind_sql, kind_params).items()):
+            for (owner, dirn, kind), nbs in sorted(
+                self._ranked_groups(frontier, steps, kind_sql, kind_params).items()
+            ):
                 if per_node_cap is not None and len(nbs) > per_node_cap:
-                    stubs.append({"id": stub_id(owner, dirn, kind), "owner": owner, "direction": dirn,
-                                  "kind": kind, "hidden": len(nbs) - per_node_cap, "offset": per_node_cap})
+                    stubs.append(
+                        {
+                            "id": stub_id(owner, dirn, kind),
+                            "owner": owner,
+                            "direction": dirn,
+                            "kind": kind,
+                            "hidden": len(nbs) - per_node_cap,
+                            "offset": per_node_cap,
+                        }
+                    )
                     nbs = nbs[:per_node_cap]
                 found.update({i: key for key, i in nbs})
             ring = sorted((key, i) for i, key in found.items() if i not in depth_of)
@@ -269,18 +299,25 @@ class Graph:
                 ring_counts[d] = len(ring)
                 total += len(ring)
             if limit is not None and len(ring) > limit - len(depth_of):
-                ring, truncated = ring[:max(0, limit - len(depth_of))], True
+                ring, truncated = ring[: max(0, limit - len(depth_of))], True
             for _, i in ring:
                 depth_of[i] = d
             if truncated:
                 break
             frontier = [i for _, i in ring]
-        return {"depth_of": depth_of, "stubs": stubs, "ring_counts": ring_counts,
-                "truncated": truncated, "total": total}
+        return {
+            "depth_of": depth_of,
+            "stubs": stubs,
+            "ring_counts": ring_counts,
+            "truncated": truncated,
+            "total": total,
+        }
 
     def _nodes_at(self, depth_of: dict[str, int]) -> list[dict]:
         """Node rows for {id: ring}, each with `depth`, ordered ring by ring then by name."""
-        rows = self._fetchall("SELECT * FROM nodes WHERE id IN (SELECT unnest(?))", [list(depth_of)])
+        rows = self._fetchall(
+            "SELECT * FROM nodes WHERE id IN (SELECT unnest(?))", [list(depth_of)]
+        )
         for r in rows:
             r["depth"] = depth_of[r["id"]]
         rows.sort(key=_ring_key)
@@ -314,9 +351,13 @@ class Graph:
         w = self._walk(node_id, direction, depth, edge_kinds, limit, per_node_cap)
         rows = self._nodes_at(w["depth_of"])
         kept = {r["id"] for r in rows}
-        return {"nodes": rows, "edges": self.edges_among(list(kept), edge_kinds),
-                "stubs": [s for s in w["stubs"] if s["owner"] in kept],
-                "truncated": w["truncated"], "total": w["total"]}
+        return {
+            "nodes": rows,
+            "edges": self.edges_among(list(kept), edge_kinds),
+            "stubs": [s for s in w["stubs"] if s["owner"] in kept],
+            "truncated": w["truncated"],
+            "total": w["total"],
+        }
 
     def neighbors_page(
         self, node_id: str, direction: str, kind: str, offset: int = 0, limit: int = 15
@@ -333,7 +374,7 @@ class Graph:
             return None
         groups = self._ranked_groups([node_id], self._steps(direction), "AND e.kind = ?", [kind])
         nbs = [i for _, i in groups.get((node_id, direction, kind), [])]
-        page = nbs[offset:offset + limit]
+        page = nbs[offset : offset + limit]
         position = {i: n for n, i in enumerate(page)}
         nodes = self._fetchall("SELECT * FROM nodes WHERE id IN (SELECT unnest(?))", [page])
         for n in nodes:
@@ -345,19 +386,34 @@ class Graph:
             f"AND e.kind = ? ORDER BY e.id",
             [node_id, page, kind],
         )
-        return {"nodes": nodes, "edges": edges, "total": len(nbs),
-                "hidden": max(0, len(nbs) - offset - len(page))}
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "total": len(nbs),
+            "hidden": max(0, len(nbs) - offset - len(page)),
+        }
 
     # Tie-break order among equally good matches: types and functions before containers and members.
-    SEARCH_KIND_PRIORITY = ("class", "type", "function", "method", "package", "module",
-                            "file", "variable", "field")
+    SEARCH_KIND_PRIORITY = (
+        "class",
+        "type",
+        "function",
+        "method",
+        "package",
+        "module",
+        "file",
+        "variable",
+        "field",
+    )
 
     @classmethod
     def _kind_rank_sql(cls, column: str) -> str:
         """SQL CASE ranking a node kind by SEARCH_KIND_PRIORITY (unknown kinds last)."""
-        return f"CASE {column} " + " ".join(
-            f"WHEN '{k}' THEN {i}" for i, k in enumerate(cls.SEARCH_KIND_PRIORITY)
-        ) + f" ELSE {len(cls.SEARCH_KIND_PRIORITY)} END"
+        return (
+            f"CASE {column} "
+            + " ".join(f"WHEN '{k}' THEN {i}" for i, k in enumerate(cls.SEARCH_KIND_PRIORITY))
+            + f" ELSE {len(cls.SEARCH_KIND_PRIORITY)} END"
+        )
 
     def search(
         self,
@@ -393,10 +449,14 @@ class Graph:
                 where.append(f"{col} IN ({', '.join('?' * len(vals))})")
                 params += list(vals)
         where_sql = " AND ".join(where)
-        total = self.conn.execute(f"SELECT COUNT(*) FROM nodes n WHERE {where_sql}", params).fetchone()[0]
-        match_rank = (f"CASE WHEN {name} = ? OR {qname} = ? THEN 0 "
-                      f"WHEN {name} LIKE ? ESCAPE '\\' OR {qname} LIKE ? ESCAPE '\\' THEN 1 "
-                      f"WHEN {sub} THEN 2 ELSE 3 END")
+        total = self.conn.execute(
+            f"SELECT COUNT(*) FROM nodes n WHERE {where_sql}", params
+        ).fetchone()[0]
+        match_rank = (
+            f"CASE WHEN {name} = ? OR {qname} = ? THEN 0 "
+            f"WHEN {name} LIKE ? ESCAPE '\\' OR {qname} LIKE ? ESCAPE '\\' THEN 1 "
+            f"WHEN {sub} THEN 2 ELSE 3 END"
+        )
         rank_params = [q, q, like_prefix, like_prefix, like_any, like_any]
         rows = self._fetchall(
             f"SELECT n.*, "
@@ -421,8 +481,15 @@ class Graph:
             [node_ids, node_ids, *kind_params],
         )
 
-    def _union_walk(self, node_id: str, directions: list[str], edge_kinds: list[str],
-                    depth: int, limit: int | None, per_node_cap: int | None) -> dict | None:
+    def _union_walk(
+        self,
+        node_id: str,
+        directions: list[str],
+        edge_kinds: list[str],
+        depth: int,
+        limit: int | None,
+        per_node_cap: int | None,
+    ) -> dict | None:
         """Walk each direction independently, merge (keeping the smaller depth) and truncate.
 
         Result shape of `neighborhood` plus `ring_counts` {depth: nodes found} for depth >= 1:
@@ -454,7 +521,8 @@ class Graph:
         kept = {r["id"] for r in rows}
         stubs = {s["id"]: s for w in walks for s in w["stubs"] if s["owner"] in kept}
         return {
-            "nodes": rows, "edges": self.edges_among(list(kept), edge_kinds),
+            "nodes": rows,
+            "edges": self.edges_among(list(kept), edge_kinds),
             "stubs": sorted(stubs.values(), key=lambda s: s["id"]),
             "truncated": trimmed or any_cut,
             "total": max([found, *(w["total"] for w in walks)]),
@@ -466,8 +534,14 @@ class Graph:
     # and Dependencies follow them forwards (for inherits: ancestors).
     REACH_KINDS = ["calls", "references", "instantiates", "inherits"]
 
-    def reach(self, node_id: str, mode: str = "both", depth: int = 2,
-              limit: int | None = None, per_node_cap: int | None = None) -> dict | None:
+    def reach(
+        self,
+        node_id: str,
+        mode: str = "both",
+        depth: int = 2,
+        limit: int | None = None,
+        per_node_cap: int | None = None,
+    ) -> dict | None:
         """The Impact set ('impact'), the Dependencies ('dependencies') or their union ('both').
 
         Same result shape as `neighborhood`, plus `ring_counts` (see `_union_walk`).
@@ -477,7 +551,10 @@ class Graph:
 
     # Hierarchy views: the edge kinds and directions each mode follows from the Focus node. Type mode
     # is ancestors plus descendants (never siblings); declaration mode is the contained members.
-    HIERARCHY_MODES = {"type": (["in", "out"], ["inherits"]), "declaration": (["out"], ["contains", "defines"])}
+    HIERARCHY_MODES = {
+        "type": (["in", "out"], ["inherits"]),
+        "declaration": (["out"], ["contains", "defines"]),
+    }
 
     def hierarchy(self, node_id: str, mode: str, limit: int | None = None) -> dict | None:
         """The type or declaration hierarchy around a node, truncated deepest ring first.
@@ -486,7 +563,9 @@ class Graph:
         applied during the walk, so a big hierarchy costs no more than its budget.
         """
         directions, kinds = self.HIERARCHY_MODES[mode]
-        return self._union_walk(node_id, directions, kinds, depth=1_000_000, limit=limit, per_node_cap=None)
+        return self._union_walk(
+            node_id, directions, kinds, depth=1_000_000, limit=limit, per_node_cap=None
+        )
 
     def neighbor_counts(self, node_id: str) -> dict[str, dict[str, int]]:
         """Distinct neighbor nodes per edge kind, split by direction: {"in": {...}, "out": {...}}."""
@@ -514,7 +593,10 @@ class Graph:
 
     def edge_kinds(self) -> list[str]:
         """Distinct edge kinds present in the graph, sorted."""
-        return [r[0] for r in self.conn.execute("SELECT DISTINCT kind FROM edges ORDER BY kind").fetchall()]
+        return [
+            r[0]
+            for r in self.conn.execute("SELECT DISTINCT kind FROM edges ORDER BY kind").fetchall()
+        ]
 
     def overview(
         self,
@@ -543,8 +625,10 @@ class Graph:
         """
         try:
             strategy = self._GROUPINGS[group_by]
-        except KeyError:
-            raise ValueError(f"unknown group_by {group_by!r}; expected one of {sorted(self._GROUPINGS)}")
+        except KeyError as exc:
+            raise ValueError(
+                f"unknown group_by {group_by!r}; expected one of {sorted(self._GROUPINGS)}"
+            ) from exc
         grouping = strategy(self, externals)
         groups = grouping.groups
 
@@ -566,7 +650,10 @@ class Graph:
                 return None
             return collapsed_at(gid) or (gid if groups[gid]["node_id"] == node_id else node_id)
 
-        edge_sql, params = "SELECT source_id, target_id, kind FROM edges WHERE kind <> 'contains'", []
+        edge_sql, params = (
+            "SELECT source_id, target_id, kind FROM edges WHERE kind <> 'contains'",
+            [],
+        )
         if kinds is not None:
             edge_sql += " AND kind IN (SELECT unnest(?))"
             params.append([k for k in kinds if k != "contains"])
@@ -578,43 +665,77 @@ class Graph:
             per_kind = counts.setdefault((a, b), {})
             per_kind[kind] = per_kind.get(kind, 0) + 1
         edges = [
-            {"id": f"agg:{a}>{b}", "source_id": a, "target_id": b,
-             "kinds": dict(sorted(k.items())), "count": sum(k.values())}
+            {
+                "id": f"agg:{a}>{b}",
+                "source_id": a,
+                "target_id": b,
+                "kinds": dict(sorted(k.items())),
+                "count": sum(k.values()),
+            }
             for (a, b), k in sorted(counts.items())
         ]
 
         def shown(g: dict) -> bool:
-            return g["parent"] is None or (g["parent"] in open_groups and shown(groups[g["parent"]]))
+            return g["parent"] is None or (
+                g["parent"] in open_groups and shown(groups[g["parent"]])
+            )
 
         out_groups = sorted(
-            ({**g, "expanded": g["id"] in open_groups, "member_count": grouping.member_counts[g["id"]]}
-             for g in groups.values() if shown(g)),
+            (
+                {
+                    **g,
+                    "expanded": g["id"] in open_groups,
+                    "member_count": grouping.member_counts[g["id"]],
+                }
+                for g in groups.values()
+                if shown(g)
+            ),
             key=lambda g: (g["parent"] or "", g["kind"], g["name"], g["id"]),
         )
         shown_open = [g["id"] for g in out_groups if g["expanded"]]
         open_shown = set(shown_open)
-        member_ids = [(n, gid) for n, gid in grouping.group_of.items()
-                      if gid in open_shown and groups[gid]["node_id"] != n]
+        member_ids = [
+            (n, gid)
+            for n, gid in grouping.group_of.items()
+            if gid in open_shown and groups[gid]["node_id"] != n
+        ]
         truncated = member_limit is not None and len(member_ids) > member_limit
         members = self._fetchall(
             "SELECT n.*, p.parent FROM nodes n "
             "JOIN (SELECT unnest(?) AS id, unnest(?) AS parent) p ON p.id = n.id "
             "ORDER BY p.parent, COALESCE(n.line_start, 0), n.name, n.id"
             + (" LIMIT ?" if truncated else ""),
-            [[n for n, _ in member_ids], [gid for _, gid in member_ids]] + ([member_limit] if truncated else []),
+            [[n for n, _ in member_ids], [gid for _, gid in member_ids]]
+            + ([member_limit] if truncated else []),
         )
         if truncated:  # edges to members that were cut have nothing to attach to
             shown_items = {g["id"] for g in out_groups} | {m["id"] for m in members}
-            edges = [e for e in edges if e["source_id"] in shown_items and e["target_id"] in shown_items]
-        return {"groups": out_groups, "nodes": members, "edges": edges,
-                "truncated": truncated, "total": len(out_groups) + len(member_ids)}
+            edges = [
+                e for e in edges if e["source_id"] in shown_items and e["target_id"] in shown_items
+            ]
+        return {
+            "groups": out_groups,
+            "nodes": members,
+            "edges": edges,
+            "truncated": truncated,
+            "total": len(out_groups) + len(member_ids),
+        }
 
     @staticmethod
     def _external_group(groups: dict[str, dict]) -> str:
         """The single `external` Group (created on first use); shared by every grouping."""
-        groups.setdefault("external", {"id": "external", "kind": "external", "name": "external",
-                                       "qualified_name": None, "file_path": None,
-                                       "node_id": None, "parent": None})
+        groups.setdefault(
+            "external",
+            {
+                "id": "external",
+                "kind": "external",
+                "name": "external",
+                "qualified_name": None,
+                "file_path": None,
+                "node_id": None,
+                "parent": None,
+            },
+        )
         return "external"
 
     def _directory_grouping(self, externals: bool) -> "_Grouping":
@@ -624,8 +745,7 @@ class Graph:
         are relative to it so they never expose a server path. Nodes without a `file_path`
         (External placeholders) go in one `external` Group when `externals`.
         """
-        rows = self._fetchall(
-            "SELECT id, kind, name, qualified_name, file_path FROM nodes")
+        rows = self._fetchall("SELECT id, kind, name, qualified_name, file_path FROM nodes")
         files = {r["file_path"]: r for r in rows if r["kind"] == "file" and r["file_path"]}
         root = self.common_root()
         groups: dict[str, dict] = {}
@@ -635,15 +755,27 @@ class Graph:
                 return None
             gid = "dir:" + (os.path.relpath(path, root).replace(os.sep, "/") if root else path)
             if gid not in groups:
-                groups[gid] = {"id": gid, "kind": "directory", "name": os.path.basename(path),
-                               "qualified_name": path, "file_path": path, "node_id": None,
-                               "parent": dir_group(os.path.dirname(path))}
+                groups[gid] = {
+                    "id": gid,
+                    "kind": "directory",
+                    "name": os.path.basename(path),
+                    "qualified_name": path,
+                    "file_path": path,
+                    "node_id": None,
+                    "parent": dir_group(os.path.dirname(path)),
+                }
             return gid
 
         for path, f in files.items():
-            groups[f["id"]] = {"id": f["id"], "kind": "file", "name": f["name"],
-                               "qualified_name": f["qualified_name"], "file_path": path,
-                               "node_id": f["id"], "parent": dir_group(os.path.dirname(path))}
+            groups[f["id"]] = {
+                "id": f["id"],
+                "kind": "file",
+                "name": f["name"],
+                "qualified_name": f["qualified_name"],
+                "file_path": path,
+                "node_id": f["id"],
+                "parent": dir_group(os.path.dirname(path)),
+            }
         group_of: dict[str, str] = {}
         for r in rows:
             f = files.get(r["file_path"]) if r["file_path"] else None
@@ -668,16 +800,24 @@ class Graph:
         by_id = {r["id"]: r for r in rows}
         children: dict[str, list[str]] = {}
         for p, c in self.conn.execute(
-                "SELECT source_id, target_id FROM edges WHERE kind = 'contains'").fetchall():
+            "SELECT source_id, target_id FROM edges WHERE kind = 'contains'"
+        ).fetchall():
             children.setdefault(p, []).append(c)
         pkgs = {r["id"]: r for r in rows if r["kind"] == "package" and r["file_path"]}
         files = {r["file_path"]: r for r in rows if r["kind"] == "file" and r["file_path"]}
 
         groups: dict[str, dict] = {
-            pid: {"id": pid, "kind": "package", "name": r["name"],
-                  "qualified_name": r["qualified_name"], "file_path": r["file_path"],
-                  "node_id": pid, "parent": None}
-            for pid, r in sorted(pkgs.items(), key=lambda kv: kv[1]["qualified_name"] or "")}
+            pid: {
+                "id": pid,
+                "kind": "package",
+                "name": r["name"],
+                "qualified_name": r["qualified_name"],
+                "file_path": r["file_path"],
+                "node_id": pid,
+                "parent": None,
+            }
+            for pid, r in sorted(pkgs.items(), key=lambda kv: kv[1]["qualified_name"] or "")
+        }
         group_of: dict[str, str] = {pid: pid for pid in pkgs}
         owner_file: dict[str, str] = {}  # file node id -> first top-level Package it contains
         for pid in groups:
@@ -700,9 +840,18 @@ class Graph:
 
         def file_group(path: str) -> str:
             f = files[path]
-            groups.setdefault(f["id"], {"id": f["id"], "kind": "file", "name": f["name"],
-                                        "qualified_name": f["qualified_name"], "file_path": path,
-                                        "node_id": f["id"], "parent": None})
+            groups.setdefault(
+                f["id"],
+                {
+                    "id": f["id"],
+                    "kind": "file",
+                    "name": f["name"],
+                    "qualified_name": f["qualified_name"],
+                    "file_path": path,
+                    "node_id": f["id"],
+                    "parent": None,
+                },
+            )
             return f["id"]
 
         for r in rows:
@@ -814,8 +963,7 @@ class Graph:
     def ast(self, file_path: str) -> dict:
         """Return raw AST for a file (requires Rust extension; not yet implemented)."""
         raise NotImplementedError(
-            "ast() requires the Rust extension (codegraph_core). "
-            "Run `maturin develop` to build it."
+            "ast() requires the Rust extension (codegraph_core). Run `maturin develop` to build it."
         )
 
     def close(self) -> None:

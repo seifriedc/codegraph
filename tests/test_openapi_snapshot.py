@@ -4,6 +4,7 @@ The JS client (codegraph/vis/static/api.js and its callers) is written by hand a
 contract, so any API change must be a deliberate, reviewed one.
 Regenerate with:  pytest tests/test_openapi_snapshot.py --update-openapi-snapshot
 """
+
 from __future__ import annotations
 import json
 from pathlib import Path
@@ -23,7 +24,9 @@ def test_openapi_schema_matches_committed_snapshot(indexed_db, request):
         SNAPSHOT.parent.mkdir(exist_ok=True)
         SNAPSHOT.write_text(actual)
         return
-    assert SNAPSHOT.exists(), "No OpenAPI snapshot. Run: pytest tests/test_openapi_snapshot.py --update-openapi-snapshot"
+    assert SNAPSHOT.exists(), (
+        "No OpenAPI snapshot. Run: pytest tests/test_openapi_snapshot.py --update-openapi-snapshot"
+    )
     assert actual == SNAPSHOT.read_text(), (
         "The HTTP API contract changed (OpenAPI schema differs from tests/snapshots/openapi.json).\n"
         "1. Update the JS client: codegraph/vis/static/api.js and every caller affected by the change.\n"

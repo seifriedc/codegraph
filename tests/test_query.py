@@ -1,4 +1,5 @@
 """Integration tests: traversal and high-level query API."""
+
 from __future__ import annotations
 import pytest
 from pathlib import Path
@@ -66,8 +67,11 @@ def test_mutation_add_node(tmp_path):
     idx = Indexer(db)
     idx.index(FIXTURES / "cpp")
     nid = idx.add_node(
-        kind="function", name="helper", language="cpp",
-        qualified_name="helper", file_path="/synthetic/helper.cpp"
+        kind="function",
+        name="helper",
+        language="cpp",
+        qualified_name="helper",
+        file_path="/synthetic/helper.cpp",
     )
     idx.close()
 
@@ -139,5 +143,10 @@ def test_update_node_metadata(tmp_path):
     g2 = Graph(db)
     updated = g2.node_by_id(fn["id"])
     import json
-    meta = json.loads(updated["metadata"]) if isinstance(updated["metadata"], str) else updated["metadata"]
+
+    meta = (
+        json.loads(updated["metadata"])
+        if isinstance(updated["metadata"], str)
+        else updated["metadata"]
+    )
     assert meta.get("complexity") == 5

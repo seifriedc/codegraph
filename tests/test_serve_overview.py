@@ -1,4 +1,5 @@
 """Integration tests at the HTTP API seam: /api/overview over the fixture index."""
+
 from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
@@ -20,7 +21,15 @@ def test_landing_overview_is_the_top_level_directory_groups(client):
     r = client.get("/api/overview")
     assert r.status_code == 200
     body = r.json()
-    assert set(body) == {"group_by", "kinds", "available_kinds", "nodes", "edges", "truncated", "total"}
+    assert set(body) == {
+        "group_by",
+        "kinds",
+        "available_kinds",
+        "nodes",
+        "edges",
+        "truncated",
+        "total",
+    }
     assert body["group_by"] == "directory"
     groups = by_path(body)
     # paths are relative to the common ancestor of indexed files; fixtures live in ada/ c/ cpp/
@@ -69,7 +78,11 @@ def test_expanded_ids_come_from_the_previous_response(client):
     nodes = {n["id"]: n for n in second["nodes"]}
     assert nodes[cpp["id"]]["expanded"] is True
     shapes = next(n for n in second["nodes"] if n["path"] == "cpp/shapes.cpp")
-    assert shapes["parent"] == cpp["id"] and shapes["kind"] == "file" and shapes["node_id"] == shapes["id"]
+    assert (
+        shapes["parent"] == cpp["id"]
+        and shapes["kind"] == "file"
+        and shapes["node_id"] == shapes["id"]
+    )
 
     third = client.get("/api/overview", params={"expanded": [cpp["id"], shapes["id"]]}).json()
     members = [n for n in third["nodes"] if n["parent"] == shapes["id"]]

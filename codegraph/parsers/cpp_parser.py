@@ -4,13 +4,20 @@ from pathlib import Path
 from tree_sitter import Language, Parser, Node as TSNode
 import tree_sitter_cpp
 
-from codegraph.models import Node, Edge, stable_id, random_id
+from codegraph.models import Node, Edge, stable_id
 from codegraph.parsers.base import (
-    make_file_node, node_text, contains_edge,
-    imports_edge, calls_edge, inherits_edge, references_edge, external_node,
+    make_file_node,
+    node_text,
+    contains_edge,
+    inherits_edge,
+    references_edge,
+    external_node,
 )
 from codegraph.parsers.c_parser import (
-    _function_name, _declarator_name, _handle_include, _handle_call,
+    _function_name,
+    _declarator_name,
+    _handle_include,
+    _handle_call,
 )
 
 _LANGUAGE = Language(tree_sitter_cpp.language())
@@ -169,8 +176,12 @@ def _find_function_declarator(ts_node: TSNode) -> TSNode | None:
 
 
 def _handle_base_classes(
-    class_node: TSNode, child: Node, file_path: str,
-    nodes: list[Node], edges: list[Edge], source: bytes,
+    class_node: TSNode,
+    child: Node,
+    file_path: str,
+    nodes: list[Node],
+    edges: list[Edge],
+    source: bytes,
 ) -> None:
     base_clause = None
     for c in class_node.named_children:

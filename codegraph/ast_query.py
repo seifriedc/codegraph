@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator
 
@@ -31,9 +31,7 @@ def resolve_files(path: Path | None, db: Path | None) -> list[Path]:
         import duckdb
 
         conn = duckdb.connect(str(db), read_only=True)
-        rows = conn.execute(
-            "SELECT DISTINCT file_path FROM nodes WHERE kind = 'file'"
-        ).fetchall()
+        rows = conn.execute("SELECT DISTINCT file_path FROM nodes WHERE kind = 'file'").fetchall()
         conn.close()
         return sorted(Path(r[0]) for r in rows if Path(r[0]).exists())
 
@@ -158,6 +156,7 @@ def _read_pattern() -> str | None:
     """
     try:
         import readline as _rl
+
         history_start = _rl.get_current_history_length()
     except ImportError:
         _rl = None  # type: ignore[assignment]
@@ -246,6 +245,7 @@ def run_repl(
                 matches = list(query_files(pattern, files, language=lang_filter, verbose=verbose))
                 if json_mode:
                     import json
+
                     print(json.dumps([_match_to_dict(m) for m in matches], indent=2))
                 else:
                     for m in matches:
@@ -270,7 +270,7 @@ def _match_to_dict(m: ASTMatch) -> dict:
         "file": str(m.file),
         "pattern_index": m.pattern_index,
         "captures": {
-            name: [{"text": t, "line": l, "col": c} for t, l, c in entries]
+            name: [{"text": t, "line": ln, "col": c} for t, ln, c in entries]
             for name, entries in m.captures.items()
         },
     }

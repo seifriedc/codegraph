@@ -17,7 +17,7 @@ def random_id() -> str:
 
 @dataclass
 class Node:
-    kind: str        # file | module | package | function | class | method | type | variable
+    kind: str  # file | module | package | function | class | method | type | variable
     name: str
     language: str
     id: str = field(default_factory=random_id)
@@ -30,10 +30,10 @@ class Node:
 
 @dataclass
 class Edge:
-    kind: str        # imports | calls | defines | contains | inherits | references | instantiates
+    kind: str  # imports | calls | defines | contains | inherits | references | instantiates
     source_id: str
     target_id: str
-    id: str = ""     # empty -> derived deterministically in __post_init__
+    id: str = ""  # empty -> derived deterministically in __post_init__
     file_path: str | None = None
     line: int | None = None
     col: int | None = None

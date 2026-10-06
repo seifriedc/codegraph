@@ -1,4 +1,5 @@
 """Graph.search ranking primitive: degree breaks ties after match tier and kind priority."""
+
 from __future__ import annotations
 import pytest
 

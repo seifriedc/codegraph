@@ -1,4 +1,5 @@
 """Graph read-only mode: never writes, never runs DDL, allows concurrent opens."""
+
 from __future__ import annotations
 import duckdb
 import pytest

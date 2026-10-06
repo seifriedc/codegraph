@@ -62,14 +62,23 @@ def connect(db_path: str | Path, read_only: bool = False) -> duckdb.DuckDBPyConn
 
 def insert_nodes(conn: duckdb.DuckDBPyConnection, nodes: list) -> None:
     import json
+
     if not nodes:
         return
     conn.executemany(
         _INSERT_NODE,
         [
-            (n.id, n.kind, n.name, n.qualified_name,
-             n.file_path, n.line_start, n.line_end,
-             n.language, json.dumps(n.metadata))
+            (
+                n.id,
+                n.kind,
+                n.name,
+                n.qualified_name,
+                n.file_path,
+                n.line_start,
+                n.line_end,
+                n.language,
+                json.dumps(n.metadata),
+            )
             for n in nodes
         ],
     )
@@ -80,9 +89,5 @@ def insert_edges(conn: duckdb.DuckDBPyConnection, edges: list) -> None:
         return
     conn.executemany(
         _INSERT_EDGE,
-        [
-            (e.id, e.kind, e.source_id, e.target_id,
-             e.file_path, e.line, e.col)
-            for e in edges
-        ],
+        [(e.id, e.kind, e.source_id, e.target_id, e.file_path, e.line, e.col) for e in edges],
     )

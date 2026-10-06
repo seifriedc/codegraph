@@ -1,4 +1,5 @@
 """Integration tests: index fixture files and verify node/edge counts."""
+
 from __future__ import annotations
 import pytest
 from pathlib import Path
@@ -14,6 +15,7 @@ def tmp_db(tmp_path):
 
 
 # ── Ada ───────────────────────────────────────────────────────────────────────
+
 
 def test_ada_creates_file_nodes(tmp_db):
     idx = Indexer(tmp_db)
@@ -110,6 +112,7 @@ def test_ada_calls_edge(tmp_db):
     calls = g.edges_from(distance["id"], kinds=["calls"])
     callee_ids = {e["target_id"] for e in calls}
     from codegraph.models import stable_id
+
     assert stable_id("function:ada:Ada.Numerics.Elementary_Functions.Sqrt") in callee_ids
 
 
@@ -151,6 +154,7 @@ def test_ada_unqualified_call_resolves_to_package_scope(tmp_db):
     calls = g.edges_from(translate["id"], kinds=["calls"])
     callee_ids = {e["target_id"] for e in calls}
     from codegraph.models import stable_id
+
     assert stable_id("function:ada:Geometry.Distance") in callee_ids
 
 
@@ -207,6 +211,7 @@ def test_ada_reindex_gives_identical_node_and_edge_ids(tmp_path):
 
 # ── C ─────────────────────────────────────────────────────────────────────────
 
+
 def test_c_creates_file_node(tmp_db):
     idx = Indexer(tmp_db)
     count = idx.index(FIXTURES / "c")
@@ -244,6 +249,7 @@ def test_c_extracts_includes(tmp_db):
 
 
 # ── C++ ───────────────────────────────────────────────────────────────────────
+
 
 def test_cpp_creates_file_node(tmp_db):
     idx = Indexer(tmp_db)

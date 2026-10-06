@@ -1,0 +1,25 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff check
+        entry: uv run ruff check --fix
+        language: system
+        types: [python]
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format
+        language: system
+        types: [python]
+      - id: pytest
+        name: pytest
+        entry: uv run pytest -q -x
+        language: system
+        pass_filenames: false
+        types: [python]
+      - id: node-tests
+        name: node tests
+        entry: sh -c 'node --test tests/js/*.test.mjs'
+        language: system
+        pass_filenames: false
+        files: ^(codegraph/vis/static/|tests/js/)

@@ -4,10 +4,15 @@ from pathlib import Path
 from tree_sitter import Language, Parser, Node as TSNode
 import tree_sitter_c
 
-from codegraph.models import Node, Edge, stable_id, random_id
+from codegraph.models import Node, Edge, stable_id
 from codegraph.parsers.base import (
-    make_file_node, node_text, contains_edge,
-    imports_edge, calls_edge, references_edge, external_node,
+    make_file_node,
+    node_text,
+    contains_edge,
+    imports_edge,
+    calls_edge,
+    references_edge,
+    external_node,
 )
 
 _LANGUAGE = Language(tree_sitter_c.language())
@@ -122,22 +127,30 @@ def _walk(
 
 
 def _handle_include(
-    ts_node: TSNode, parent: Node, file_path: str,
-    nodes: list[Node], edges: list[Edge], source: bytes,
+    ts_node: TSNode,
+    parent: Node,
+    file_path: str,
+    nodes: list[Node],
+    edges: list[Edge],
+    source: bytes,
 ) -> None:
     path_node = ts_node.child_by_field_name("path")
     if path_node is None:
         path_node = ts_node.named_children[0] if ts_node.named_children else None
     if path_node:
-        raw = node_text(path_node, source).strip("<>\"")
+        raw = node_text(path_node, source).strip('<>"')
         ext = external_node(raw, "c", "module")
         nodes.append(ext)
         edges.append(imports_edge(parent, ext, file_path, ts_node))
 
 
 def _handle_call(
-    ts_node: TSNode, caller: Node, file_path: str,
-    nodes: list[Node], edges: list[Edge], source: bytes,
+    ts_node: TSNode,
+    caller: Node,
+    file_path: str,
+    nodes: list[Node],
+    edges: list[Edge],
+    source: bytes,
 ) -> None:
     fn_node = ts_node.child_by_field_name("function")
     if fn_node is None:

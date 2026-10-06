@@ -2,6 +2,7 @@
 
 The root itself comes from `Graph.common_root()`, the single definition shared with the Overview.
 """
+
 from __future__ import annotations
 
 import os

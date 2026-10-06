@@ -1,4 +1,5 @@
 """FastAPI application factory for `codegraph serve`."""
+
 from __future__ import annotations
 
 from importlib import resources
