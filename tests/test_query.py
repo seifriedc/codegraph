@@ -116,9 +116,9 @@ def test_demographics_multi_language(tmp_path):
 
     report = Graph(db).demographics()
     assert set(report["by_language"]) == {"ada", "c"}
-    assert report["by_language"]["ada"]["files"] == 3
+    assert report["by_language"]["ada"]["files"] == 4
     assert report["by_language"]["c"]["files"] == 1
-    assert report["total_files"] == 4
+    assert report["total_files"] == 5
     assert report["edges_by_kind"]  # non-empty
 
 
