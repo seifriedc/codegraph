@@ -1094,7 +1094,7 @@
             }
           },
           {
-            "description": "Impact set / Dependencies / both; overrides direction and kinds",
+            "description": "neighborhood (default): all edge kinds, honouring direction and kinds. impact / dependencies / both: the Impact set, the Dependencies or their union; these ignore direction and kinds",
             "in": "query",
             "name": "mode",
             "required": false,
@@ -1102,6 +1102,7 @@
               "anyOf": [
                 {
                   "enum": [
+                    "neighborhood",
                     "impact",
                     "dependencies",
                     "both"
@@ -1112,7 +1113,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Impact set / Dependencies / both; overrides direction and kinds",
+              "description": "neighborhood (default): all edge kinds, honouring direction and kinds. impact / dependencies / both: the Impact set, the Dependencies or their union; these ignore direction and kinds",
               "title": "Mode"
             }
           }

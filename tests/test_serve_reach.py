@@ -89,3 +89,30 @@ def test_depth_all_is_the_server_maximum_and_above_is_rejected(client):
 
 def test_unknown_node_is_404_in_a_mode(client):
     assert client.get("/api/neighborhood/nope", params={"mode": "impact"}).status_code == 404
+
+
+def _file_id(client):
+    return next(n["id"] for n in get(client, SHAPE, depth=1)["nodes"] if n["kind"] == "file")
+
+
+def test_neighborhood_mode_is_a_plain_neighborhood_honouring_direction_and_kinds(client):
+    plain = get(client, SHAPE, direction="in", kinds="inherits")
+    mode = get(client, SHAPE, mode="neighborhood", direction="in", kinds="inherits")
+    assert {n["id"] for n in mode["nodes"]} == {n["id"] for n in plain["nodes"]}
+    assert {e["kind"] for e in mode["edges"]} == {"inherits"}
+    assert mode["ring_counts"] is None
+
+
+def test_neighborhood_mode_of_a_file_shows_contains_edges(client):
+    file_id = _file_id(client)
+    body = get(client, file_id, mode="neighborhood", direction="out", depth=1)
+    assert any(e["kind"] == "contains" for e in body["edges"])
+    assert len(body["nodes"]) > 1
+    # the reach modes never show a file's contents
+    assert len(get(client, file_id, mode="dependencies", depth=1)["nodes"]) < len(body["nodes"])
+
+
+def test_reach_modes_ignore_direction_and_kinds(client):
+    a = get(client, CIRCLE, mode="dependencies", depth=1)
+    b = get(client, CIRCLE, mode="dependencies", depth=1, direction="in", kinds="contains")
+    assert {n["id"] for n in a["nodes"]} == {n["id"] for n in b["nodes"]}

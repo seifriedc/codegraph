@@ -10,7 +10,7 @@ import { BUDGET, clampLimit } from "./scale.js";
 import { defaultFilters, filtersFromParams, filtersToParams } from "./filters.js";
 
 export const DEFAULTS = Object.freeze({
-  depth: 2, direction: "both", mode: "both", view: "focus", limit: BUDGET.defaultLimit,
+  depth: 2, direction: "both", kinds: null, mode: "neighborhood", view: "focus", limit: BUDGET.defaultLimit,
   expanded: Object.freeze([]), okinds: null, groupBy: "directory", externals: false,
   filters: Object.freeze(defaultFilters()), stubs: Object.freeze([]),
 });
@@ -21,7 +21,8 @@ export const ALL_DEPTH = 10; // "all" in the UI: the server's maximum depth
 export const DIRECTIONS = ["both", "in", "out"];
 // overview = Groups + Aggregate edges; focus = neighborhood/reach; type|declaration = hierarchies
 export const VIEWS = ["overview", "focus", "type", "declaration"];
-export const MODES = ["both", "impact", "dependencies"]; // Impact set / Dependencies / union
+// neighborhood = plain (all edge kinds, honours direction and kinds); impact / dependencies / both = reach
+export const MODES = ["neighborhood", "both", "impact", "dependencies"];
 export const GROUP_BYS = ["directory", "package"];
 
 /** The view implied by the hash when `view` is absent: focus when a Focus node is given, else the overview. */
@@ -41,6 +42,7 @@ export function parseHash(hash) {
     focus,
     depth: (depth >= 1 && depth <= MAX_UI_DEPTH) || depth === ALL_DEPTH ? depth : DEFAULTS.depth,
     direction: DIRECTIONS.includes(direction) ? direction : DEFAULTS.direction,
+    kinds: p.has("kinds") ? p.get("kinds").split(",").filter(Boolean) : null,
     limit,
     mode: MODES.includes(mode) ? mode : DEFAULTS.mode,
     view: VIEWS.includes(p.get("view")) ? p.get("view") : derivedView(focus),
@@ -59,6 +61,7 @@ export function formatHash(state) {
   if (state.focus) p.set("focus", state.focus);
   if (state.depth !== DEFAULTS.depth) p.set("depth", state.depth === ALL_DEPTH ? "all" : String(state.depth));
   if (state.direction !== DEFAULTS.direction) p.set("direction", state.direction);
+  if (state.kinds && state.kinds.length) p.set("kinds", state.kinds.join(","));
   if (state.limit != null && state.limit !== DEFAULTS.limit) p.set("limit", String(clampLimit(state.limit)));
   if (state.mode !== DEFAULTS.mode) p.set("mode", state.mode);
   if (state.view && state.view !== derivedView(state.focus)) p.set("view", state.view);

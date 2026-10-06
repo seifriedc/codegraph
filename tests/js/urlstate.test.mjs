@@ -21,7 +21,7 @@ test("kind filters and stub expansions round-trip through the hash", () => {
 
 test("pan, zoom and positions are not part of the state", () => {
   assert.deepEqual(Object.keys(DEFAULTS).sort(), ["depth", "direction", "expanded", "externals", "filters",
-    "groupBy", "limit", "mode", "okinds", "stubs", "view"]);
+    "groupBy", "kinds", "limit", "mode", "okinds", "stubs", "view"]);
 });
 
 const base = { ...DEFAULTS, focus: "A", view: "focus" };

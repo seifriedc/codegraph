@@ -2,6 +2,7 @@
 import { ALL_DEPTH, MAX_UI_DEPTH } from "./state.js";
 
 export const MODES = [
+  { value: "neighborhood", label: "Neighborhood (all edges)" },
   { value: "both", label: "Impact + dependencies" },
   { value: "impact", label: "Impact set (what breaks)" },
   { value: "dependencies", label: "Dependencies (what it needs)" },
@@ -24,3 +25,6 @@ export function ringText(ringCounts, depth) {
   for (let d = 1; d <= last; d++) parts.push(`${d}: ${ringCounts[d] || 0}`);
   return parts.join(" · ");
 }
+
+/** The direction control only means something in the plain neighborhood mode (reach modes fix their own). */
+export const directionEnabled = (mode) => mode === "neighborhood";

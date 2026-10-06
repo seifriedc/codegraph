@@ -7,9 +7,9 @@ export const MAX_EXPANDED = 50; // cap on `expanded` ids and on `stubs` expansio
 // Changes that are navigation: Back steps through exactly these. Everything else replaces the entry.
 const PUSH_KEYS = ["focus", "view", "mode", "groupBy"];
 // Changes that need new data from the server; filters and stub expansions only touch what is on screen.
-const REFETCH_KEYS = ["focus", "view", "depth", "direction", "mode", "limit", "groupBy", "expanded", "okinds", "externals"];
+const REFETCH_KEYS = ["focus", "view", "depth", "direction", "kinds", "mode", "limit", "groupBy", "expanded", "okinds", "externals"];
 // Changes that reload the focus neighbourhood, invalidating stub expansions (their pages depend on it).
-const RESET_STUB_KEYS = ["focus", "view", "depth", "direction", "mode", "limit"];
+const RESET_STUB_KEYS = ["focus", "view", "depth", "direction", "kinds", "mode", "limit"];
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const changed = (prev, next, keys) => keys.filter((k) => !same(prev[k], next[k]));

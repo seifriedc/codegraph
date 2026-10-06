@@ -36,14 +36,16 @@ def register(app: FastAPI, get_graph: Callable, rel: Callable[[str | None], str 
         kinds: str | None = Query(None, description="comma-separated edge kinds"),
         limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
         per_node_cap: int = Query(DEFAULT_PER_NODE_CAP, ge=1, le=MAX_PER_NODE_CAP),
-        mode: Literal["impact", "dependencies", "both"] | None = Query(
-            None, description="Impact set / Dependencies / both; overrides direction and kinds"),
+        mode: Literal["neighborhood", "impact", "dependencies", "both"] | None = Query(
+            None, description="neighborhood (default): all edge kinds, honouring direction and kinds. "
+                              "impact / dependencies / both: the Impact set, the Dependencies or their "
+                              "union; these ignore direction and kinds"),
         g: Graph = Depends(get_graph),
     ) -> dict:
         focus = g.resolve_node(node_id)
         if focus is None:
             raise HTTPException(404, f"node not found: {node_id}")
-        if mode:
+        if mode and mode != "neighborhood":
             r = g.reach(focus["id"], mode=mode, depth=depth, limit=limit, per_node_cap=per_node_cap)
         else:
             edge_kinds = [k for k in kinds.split(",") if k] if kinds else None

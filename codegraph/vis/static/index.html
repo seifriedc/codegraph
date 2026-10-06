@@ -91,9 +91,17 @@
       </select>
     </label>
     <label class="focus-only">Show <select id="mode"></select></label>
+    <label class="focus-only" title="Edge direction (neighborhood mode only)">Direction
+      <select id="direction">
+        <option value="both">both</option>
+        <option value="out">out (what it points to)</option>
+        <option value="in">in (what points to it)</option>
+      </select>
+    </label>
     <label class="focus-only">Depth <select id="depth"></select></label>
     <span id="rings" class="muted focus-only" title="Nodes per ring (distance from the focus)"></span>
     <button id="recenter" type="button" title="Fit all nodes in view">Recenter</button>
+    <button id="reset-zoom" type="button" title="Reset zoom to 100%">Reset zoom</button>
     <button id="raise-limit" type="button" hidden title="Show more nodes (server maximum 500)"></button>
     <button id="undo" type="button" disabled title="Undo the last expansion">Undo expand</button>
     <span id="layout-state"></span>

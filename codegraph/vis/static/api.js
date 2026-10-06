@@ -15,7 +15,7 @@ export function fetchNeighborhood(focus, { depth, direction, kinds, limit, mode,
   if (kinds && kinds.length) p.set("kinds", kinds.join(","));
   if (limit != null) p.set("limit", limit);
   if (perNodeCap != null) p.set("per_node_cap", perNodeCap);
-  if (mode) p.set("mode", mode); // "impact" | "dependencies" | "both": overrides direction and kinds
+  if (mode) p.set("mode", mode); // "neighborhood" honours direction and kinds; "impact" | "dependencies" | "both" ignore them
   const q = p.toString();
   return getJson(`/api/neighborhood/${encodeURIComponent(focus)}${q ? "?" + q : ""}`, fetchImpl);
 }

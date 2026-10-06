@@ -7,15 +7,16 @@ import { toggleEdgeKind, toggleNodeKind } from "./filters.js";
 import { countKinds, legendModel, miniLegendModel, renderLegend, renderMiniLegend } from "./legend.js";
 import { renderPanel } from "./panel.js";
 import { BUDGET, createModel, nextLimit, scaleStatus } from "./scale.js";
-import { depthOptions, MODES, ringText } from "./reach.js";
+import { depthOptions, directionEnabled, MODES, ringText } from "./reach.js";
 import { createRecent } from "./recent.js";
-import { mergeGraphs } from "./search.js";
+import { mergeAdded } from "./add-merge.js";
 import { mountSearch } from "./search-ui.js";
-import { toggleExpanded, overviewStatus } from "./overview-elements.js";
+import { createOverviewController } from "./overview-controller.js";
 import { createOverviewView, overviewStyle } from "./overview-view.js";
 import { createUrlController, notFoundMessage, replayStubs } from "./urlstate.js";
 
 const $ = (id) => document.getElementById(id);
+const setLayoutState = (s) => { $("layout-state").textContent = s === "running" ? "settling" : "settled"; };
 
 const canvas = createCanvas($("cy"), {
   cytoscape: window.cytoscape,
@@ -24,19 +25,18 @@ const canvas = createCanvas($("cy"), {
   // Clicking a node refocuses on it (pushes a history entry; hashchange does the rendering).
   styleRules: [overviewStyle],
   onTapNode: (id) => {
-    if (url.state.view === "overview") return overviewTap(id);
+    if (url.state.view === "overview") return ovc.tap(id);
     if (id !== url.state.focus) setState({ focus: id });
   },
   onTapStub: (stub) => expandStub(stub),
-  onLayoutState: (s) => { $("layout-state").textContent = s === "running" ? "settling" : "settled"; },
+  onLayoutState: setLayoutState,
 });
 
 if (window.cytoscapeFcose) window.cytoscape.use(window.cytoscapeFcose);
 const overview = createOverviewView(canvas.cy, {
   tooltip: $("tip"),
-  onLayoutState: (s) => { $("layout-state").textContent = s === "running" ? "settling" : "settled"; },
+  onLayoutState: setLayoutState,
 });
-canvas.cy.on("tap", (evt) => { if (evt.target === canvas.cy && url.state.view === "overview") select(null); });
 
 // The URL is the source of truth for view state; urlstate.js decides push vs replace (see planChange).
 const url = createUrlController({
@@ -52,72 +52,18 @@ const expanding = new Set();
 let counts = { nodes: {}, edges: {} };
 let requestSeq = 0; // ignore responses that arrive after a newer request
 
-// ---- Overview (landing view) ----
+// ---- Overview (landing view): see overview-controller.js ----
 let shownView = null;   // which view the canvas currently holds; elements are cleared on a switch
-let selected = null;    // {id, nodeId, name} of the selected overview node
-
-function select(data) {
-  selected = data ? { id: data.id, nodeId: data.nodeId, name: data.full } : null;
-  $("ov-selection").textContent = selected ? selected.name : "";
-  $("ov-focus").disabled = !(selected && selected.nodeId);
-}
-
-function overviewTap(id) {
-  const data = canvas.cy.getElementById(id).data();
-  select(data);
-  // click expands a collapsed Group in place (and collapses an expanded one)
-  if (data.group) setState({ expanded: toggleExpanded(url.state.expanded, id) });
-}
-
-function renderKindFilter(resp) {
-  const box = $("ov-kinds");
-  box.replaceChildren();
-  for (const kind of resp.available_kinds) {
-    const label = document.createElement("label");
-    const cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.checked = resp.kinds.includes(kind);
-    cb.addEventListener("change", () => {
-      const on = new Set(resp.kinds);
-      if (cb.checked) on.add(kind); else on.delete(kind);
-      setState({ okinds: resp.available_kinds.filter((k) => on.has(k)) });
-    });
-    label.append(cb, ` ${kind}`);
-    box.append(label);
-  }
-}
-
-// Directory | Package toggle and externals checkbox. Group ids differ per grouping, so a switch collapses all.
-$("ov-groupby").addEventListener("change", (e) => setState({ groupBy: e.target.value, expanded: [] }));
-$("ov-externals").addEventListener("change", (e) => setState({ externals: e.target.checked, expanded: [] }));
-
-function syncOverviewControls() {
-  $("ov-groupby").value = url.state.groupBy;
-  $("ov-externals").checked = url.state.externals;
-}
-
-async function renderOverview(seq) {
-  syncOverviewControls();
-  try {
-    const resp = await fetchOverview({ groupBy: url.state.groupBy, expanded: url.state.expanded, kinds: url.state.okinds, externals: url.state.externals });
-    if (seq !== requestSeq) return;
-    $("status").textContent = overviewStatus(resp);
-    renderKindFilter(resp);
-    renderPanel($("panel"), null);
-    overview.show(resp);
-    if (selected && !canvas.cy.getElementById(selected.id).length) select(null);
-    else if (selected) canvas.cy.getElementById(selected.id).select();
-  } catch (err) {
-    if (seq === requestSeq) $("status").textContent = `Error: ${err.message}`;
-  }
-}
+const ovc = createOverviewController({
+  $, canvas, overview, url, setState, fetchOverview, renderPanel, isCurrent: (seq) => seq === requestSeq,
+});
 
 function enterView(view) {
   if (shownView === view) return;
   canvas.layout.stop();
   overview.hide();
   canvas.cy.elements().remove();
-  select(null);
+  ovc.select(null);
   document.body.dataset.view = view;
   shownView = view;
   if (view === "overview") {
@@ -130,11 +76,6 @@ function enterView(view) {
   }
 }
 
-$("ov-focus").addEventListener("click", () => {
-  if (selected && selected.nodeId) setState({ view: "focus", focus: selected.nodeId, expanded: [] });
-});
-$("ov-home").addEventListener("click", () => setState({ view: "overview", focus: null }));
-
 function applyFilters(filters) { // replace-state in the URL; visibility only, no refetch
   setState({ filters });
   canvas.setFilters(filters);
@@ -143,21 +84,28 @@ function applyFilters(filters) { // replace-state in the URL; visibility only, n
 
 function drawLegends() {
   renderLegend($("legend"), legendModel(url.state.filters, counts), {
-    // Filters are client-side visibility toggles (the server's `mode` overrides the `kinds` param).
+    // Filters are client-side visibility toggles; the `kinds` URL key is what the server fetches.
     onToggleNode: (k) => applyFilters(toggleNodeKind(url.state.filters, k)),
     onToggleEdge: (k) => applyFilters(toggleEdgeKind(url.state.filters, k)),
   });
   renderMiniLegend($("mini-legend"), miniLegendModel(url.state.filters, counts));
 }
 
+/** Neighborhood query for the current URL state: direction and kinds apply in neighborhood mode only. */
+function hoodParams() {
+  const { depth, mode, direction, kinds } = url.state;
+  return directionEnabled(mode) ? { depth, mode, direction, kinds } : { depth, mode };
+}
+
 async function render() {
   const seq = ++requestSeq;
   enterView(url.state.view === "overview" ? "overview" : "focus");
   $("view").value = url.state.view;
-  if (url.state.view === "overview") return renderOverview(seq);
+  if (url.state.view === "overview") return ovc.render(seq);
   $("depth").value = String(url.state.depth);
   $("mode").value = url.state.mode;
-  $("view").value = url.state.view;
+  $("direction").value = url.state.direction;
+  $("direction").disabled = !directionEnabled(url.state.mode);
   $("rings").textContent = "";
   canvas.setFilters(url.state.filters); // kind filters come from the URL (also after Back/Forward)
   if (!url.state.focus) {
@@ -170,7 +118,7 @@ async function render() {
     const [hood, detail] = await Promise.all([
       layered
         ? fetchHierarchy(url.state.focus, { mode: url.state.view, limit: url.state.limit })
-        : fetchNeighborhood(url.state.focus, { depth: url.state.depth, mode: url.state.mode, limit: url.state.limit, perNodeCap: BUDGET.fanOut }),
+        : fetchNeighborhood(url.state.focus, { ...hoodParams(), limit: url.state.limit, perNodeCap: BUDGET.fanOut }),
       fetchNode(url.state.focus),
     ]);
     if (seq !== requestSeq) return;
@@ -246,6 +194,7 @@ for (const o of depthOptions()) $("depth").append(new Option(o.label, String(o.v
 for (const m of MODES) $("mode").append(new Option(m.label, m.value));
 $("depth").addEventListener("change", (e) => setState({ depth: Number(e.target.value) }));
 $("mode").addEventListener("change", (e) => setState({ mode: e.target.value }));
+$("direction").addEventListener("change", (e) => setState({ direction: e.target.value }));
 $("view").addEventListener("change", (e) => setState({ view: e.target.value }));
 $("raise-limit").addEventListener("click", () => setState({ limit: nextLimit(url.state.limit) }));
 $("undo").addEventListener("click", () => {
@@ -261,6 +210,7 @@ $("prune").addEventListener("click", () => {
   updateScaleUi();
 });
 $("recenter").addEventListener("click", () => canvas.recenter());
+$("reset-zoom").addEventListener("click", () => canvas.resetZoom());
 addEventListener("hashchange", () => url.onHashChange());
 
 drawLegends();
@@ -272,16 +222,12 @@ export const search = mountSearch($("search"), {
   onFocus: (n) => setState({ focus: n.id }), // Enter: replace the Focus node
   onAdd: async (n) => { // Shift-Enter: add the node's neighborhood to what is on the canvas
     try {
-      const added = await fetchNeighborhood(n.id, { depth: url.state.depth, mode: url.state.mode });
+      const added = await fetchNeighborhood(n.id, hoodParams());
       if (!added || !baseHood || layeredView) return; // merging only applies to the focus view
-      const merged = mergeGraphs(model.view(), added);
-      const seen = new Set((model.view().stubs || []).map((x) => x.id));
-      merged.stubs = [...model.view().stubs, ...(added.stubs || []).filter((x) => !seen.has(x.id))];
-      const before = new Set(model.view().nodes.map((x) => x.id));
+      const { merged, newIds } = mergeAdded(model.view(), added);
       const { dropped } = model.adopt(merged);
       baseHood = { ...baseHood, truncated: baseHood.truncated || merged.truncated || dropped > 0 };
-      canvas.show(model.view(), { anchor: n.id, expansion: true,
-        highlight: model.view().nodes.filter((x) => !before.has(x.id)).map((x) => x.id) });
+      canvas.show(model.view(), { anchor: n.id, expansion: true, highlight: newIds });
       updateScaleUi();
     } catch (err) { $("status").textContent = `Error: ${err.message}`; }
   },
