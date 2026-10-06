@@ -26,7 +26,7 @@ def test_type_hierarchy_of_the_root_returns_its_descendants_with_inherits_edges(
     assert r.status_code == 200
     body = r.json()
     assert set(body) == {"focus", "nodes", "edges", "stubs", "truncated", "total", "ring_counts"}
-    assert body["ring_counts"] is None  # rings are a reach-view concept
+    assert body["ring_counts"] == {"1": 2}
     assert body["focus"] == SHAPE
     assert qnames(body) == {"Shape", "Circle", "Rectangle"}
     # edges point child -> parent, so dagre puts the parent on top

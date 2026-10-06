@@ -41,7 +41,7 @@ export function createCanvas(container, { cytoscape, d3, dagre, onTapNode = () =
     requestAnimationFrame(() => { zoomPending = false; cy.nodes().updateStyle(); });
   });
 
-  // Hover emphasises a node and its neighbours (their labels show even when zoomed out).
+  // Hover emphasises a node and its neighbors (their labels show even when zoomed out).
   cy.on("mouseover", "node", (evt) => evt.target.closedNeighborhood().addClass("emphasised"));
   cy.on("mouseout", "node", () => cy.elements().removeClass("emphasised"));
 
@@ -62,6 +62,16 @@ export function createCanvas(container, { cytoscape, d3, dagre, onTapNode = () =
     const opts = { eles: cy.elements(), padding: 40 };
     if (animate) cy.animate({ fit: opts }, { duration: 250 });
     else cy.fit(opts.eles, opts.padding);
+  }
+
+  /** Reset the zoom to 100% about the centre of the viewport (pan position of that centre is kept). */
+  function resetZoom(animate = true) {
+    cy.resize();
+    autoFit = false; // the user chose a zoom: the layout must not re-fit over it
+    const level = 1;
+    const renderedPosition = { x: cy.width() / 2, y: cy.height() / 2 };
+    if (animate) cy.animate({ zoom: { level, renderedPosition } }, { duration: 250 });
+    else cy.zoom({ level, renderedPosition });
   }
 
   let freshTimer = null;
@@ -135,5 +145,5 @@ export function createCanvas(container, { cytoscape, d3, dagre, onTapNode = () =
 
   function destroy() { layout.stop(); cy.destroy(); }
 
-  return { cy, show, showHierarchy, highlight, recenter, setFilters, destroy, layout };
+  return { cy, show, showHierarchy, highlight, recenter, resetZoom, setFilters, destroy, layout };
 }

@@ -47,17 +47,17 @@ def agg(r):
 def test_collapsed_overview_shows_top_level_directory_groups(repo):
     r = repo.overview()
     by_id = {g["id"]: g for g in r["groups"]}
-    assert set(by_id) == {"dir:/r/core", "dir:/r/ui", repo.ids["top.cpp"], "external"}
-    assert by_id["dir:/r/core"]["kind"] == "directory"
-    assert by_id["dir:/r/core"]["parent"] is None
-    assert by_id["dir:/r/core"]["member_count"] == 5  # 2 files + 3 functions
+    assert set(by_id) == {"dir:core", "dir:ui", repo.ids["top.cpp"], "external"}
+    assert by_id["dir:core"]["kind"] == "directory"
+    assert by_id["dir:core"]["parent"] is None
+    assert by_id["dir:core"]["member_count"] == 5  # 2 files + 3 functions
     assert by_id[repo.ids["top.cpp"]]["kind"] == "file"
     assert r["nodes"] == []
 
 
 def test_one_aggregate_edge_per_directed_pair_with_per_kind_counts(repo):
     r = repo.overview()
-    core, ui, top = "dir:/r/core", "dir:/r/ui", repo.ids["top.cpp"]
+    core, ui, top = "dir:core", "dir:ui", repo.ids["top.cpp"]
     assert agg(r) == {
         (core, ui): {"calls": 2, "references": 1},
         (ui, core): {"calls": 1},
@@ -70,8 +70,8 @@ def test_one_aggregate_edge_per_directed_pair_with_per_kind_counts(repo):
 
 def test_kind_filter_reaggregates(repo):
     r = repo.overview(kinds=["references"])
-    assert agg(r) == {("dir:/r/core", "dir:/r/ui"): {"references": 1}}
-    assert agg(repo.overview(kinds=["calls", "imports"]))[("dir:/r/core", "dir:/r/ui")] == {"calls": 2}
+    assert agg(r) == {("dir:core", "dir:ui"): {"references": 1}}
+    assert agg(repo.overview(kinds=["calls", "imports"]))[("dir:core", "dir:ui")] == {"calls": 2}
 
 
 def test_contains_is_never_aggregated_even_if_asked(repo):
@@ -90,7 +90,7 @@ def test_unknown_group_by_is_rejected(repo):
 
 
 def test_expanding_a_directory_replaces_it_with_its_files_as_a_compound(repo):
-    core, ui = "dir:/r/core", "dir:/r/ui"
+    core, ui = "dir:core", "dir:ui"
     a, b = repo.ids["core/a.cpp"], repo.ids["core/b.cpp"]
     r = repo.overview(expanded=[core])
     by_id = {g["id"]: g for g in r["groups"]}
@@ -108,13 +108,13 @@ def test_expanding_a_directory_replaces_it_with_its_files_as_a_compound(repo):
 
 def test_expanding_a_file_shows_its_members(repo):
     a = repo.ids["core/a.cpp"]
-    r = repo.overview(expanded=["dir:/r/core", a])
+    r = repo.overview(expanded=["dir:core", a])
     assert {n["name"]: n["parent"] for n in r["nodes"]} == {"a1": a, "a2": a}
     a1, a2 = repo.ids["a1"], repo.ids["a2"]
     pairs = agg(r)
     assert pairs[(a1, a2)] == {"calls": 1}  # intra-file edge appears once members are visible
-    assert pairs[(a1, "dir:/r/ui")] == {"calls": 1, "references": 1}
-    assert pairs[(a2, "dir:/r/ui")] == {"calls": 1}
+    assert pairs[(a1, "dir:ui")] == {"calls": 1, "references": 1}
+    assert pairs[(a2, "dir:ui")] == {"calls": 1}
     assert pairs[(repo.ids["core/b.cpp"], a1)] == {"calls": 1}
 
 

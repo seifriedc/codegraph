@@ -249,3 +249,17 @@ test("fetchSearch builds the query string with filters", async () => {
   await fetchSearch("ab", {}, f);
   assert.equal(url, "/api/search?q=ab");
 });
+
+test("mergeAdded unions nodes, edges and stubs and reports the new node ids", async () => {
+  const { mergeAdded } = await load("add-merge.js");
+  const n = (id) => ({ id });
+  const cur = { focus: "a", nodes: [n("a"), n("b")], edges: [{ id: "e1" }], stubs: [{ id: "s1" }], truncated: false, total: 2 };
+  const add = { focus: "c", nodes: [n("b"), n("c")], edges: [{ id: "e1" }, { id: "e2" }], stubs: [{ id: "s1" }, { id: "s2" }], truncated: true, total: 5 };
+  const { merged, newIds } = mergeAdded(cur, add);
+  assert.equal(merged.focus, "a");
+  assert.deepEqual(merged.nodes.map((x) => x.id), ["a", "b", "c"]);
+  assert.deepEqual(merged.edges.map((x) => x.id), ["e1", "e2"]);
+  assert.deepEqual(merged.stubs.map((x) => x.id), ["s1", "s2"]);
+  assert.deepEqual(newIds, ["c"]);
+  assert.equal(merged.truncated, true);
+});

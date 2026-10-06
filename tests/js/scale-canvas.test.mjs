@@ -80,3 +80,16 @@ test("an expansion keeps existing positions, spawns near the owner, highlights n
   canvas.highlight([]);
   canvas.destroy();
 });
+
+test("resetZoom returns to 100% without moving any node and stops auto-fit", () => {
+  const { canvas, cy } = setup();
+  const m = createModel();
+  m.reset(base);
+  canvas.show(m.view());
+  cy.zoom(0.4);
+  const pos = cy.nodes().map((n) => ({ ...n.position() }));
+  canvas.resetZoom(false);
+  assert.equal(cy.zoom(), 1);
+  assert.deepEqual(cy.nodes().map((n) => ({ ...n.position() })), pos);
+  canvas.destroy();
+});

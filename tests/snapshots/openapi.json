@@ -2,7 +2,7 @@
   "components": {
     "schemas": {
       "ExpandResponse": {
-        "description": "One page of a Stub node's hidden neighbours; `stub` is the continuation, null on the last page.",
+        "description": "One page of a Stub node's hidden neighbors; `stub` is the continuation, null on the last page.",
         "properties": {
           "edges": {
             "items": {
@@ -191,14 +191,14 @@
             "title": "Name",
             "type": "string"
           },
-          "neighbour_counts": {
+          "neighbor_counts": {
             "additionalProperties": {
               "additionalProperties": {
                 "type": "integer"
               },
               "type": "object"
             },
-            "title": "Neighbour Counts",
+            "title": "Neighbor Counts",
             "type": "object"
           },
           "path": {
@@ -235,7 +235,7 @@
           "language",
           "external",
           "defining_files",
-          "neighbour_counts"
+          "neighbor_counts"
         ],
         "title": "NodeDetail",
         "type": "object"
@@ -817,7 +817,7 @@
         "type": "object"
       },
       "VisStub": {
-        "description": "Stub node: stands for `hidden` neighbours of `owner` (one edge kind and direction).\n\n`offset` is how many of that group are already shown; pass it to /api/expand to page in more.",
+        "description": "Stub node: stands for `hidden` neighbors of `owner` (one edge kind and direction).\n\n`offset` is how many of that group are already shown; pass it to /api/expand to page in more.",
         "properties": {
           "direction": {
             "title": "Direction",
@@ -1052,7 +1052,7 @@
             }
           },
           {
-            "description": "comma-separated edge kinds",
+            "description": "comma-separated edge kinds (neighborhood mode)",
             "in": "query",
             "name": "kinds",
             "required": false,
@@ -1065,7 +1065,7 @@
                   "type": "null"
                 }
               ],
-              "description": "comma-separated edge kinds",
+              "description": "comma-separated edge kinds (neighborhood mode)",
               "title": "Kinds"
             }
           },
@@ -1094,7 +1094,7 @@
             }
           },
           {
-            "description": "Impact set / Dependencies / both; overrides direction and kinds",
+            "description": "neighborhood (default): all edge kinds, honouring direction and kinds. impact / dependencies / both: the Impact set, the Dependencies or their union; these ignore direction and kinds",
             "in": "query",
             "name": "mode",
             "required": false,
@@ -1102,6 +1102,7 @@
               "anyOf": [
                 {
                   "enum": [
+                    "neighborhood",
                     "impact",
                     "dependencies",
                     "both"
@@ -1112,7 +1113,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Impact set / Dependencies / both; overrides direction and kinds",
+              "description": "neighborhood (default): all edge kinds, honouring direction and kinds. impact / dependencies / both: the Impact set, the Dependencies or their union; these ignore direction and kinds",
               "title": "Mode"
             }
           }
@@ -1206,6 +1207,7 @@
               "items": {
                 "type": "string"
               },
+              "maxItems": 50,
               "title": "Expanded",
               "type": "array"
             }
@@ -1238,6 +1240,20 @@
               "description": "show external placeholders as one `external` Group",
               "title": "Externals",
               "type": "boolean"
+            }
+          },
+          {
+            "description": "cap on member nodes of expanded Groups",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 150,
+              "description": "cap on member nodes of expanded Groups",
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
             }
           }
         ],

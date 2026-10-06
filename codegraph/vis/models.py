@@ -34,7 +34,7 @@ class VisEdge(BaseModel):
 
 
 class VisStub(BaseModel):
-    """Stub node: stands for `hidden` neighbours of `owner` (one edge kind and direction).
+    """Stub node: stands for `hidden` neighbors of `owner` (one edge kind and direction).
 
     `offset` is how many of that group are already shown; pass it to /api/expand to page in more.
     """
@@ -88,12 +88,12 @@ class OverviewResponse(BaseModel):
 
 class NodeDetail(VisNode):
     defining_files: list[str]
-    # distinct neighbour nodes per edge kind: {"in": {kind: n}, "out": {kind: n}}
-    neighbour_counts: dict[str, dict[str, int]]
+    # distinct neighbor nodes per edge kind: {"in": {kind: n}, "out": {kind: n}}
+    neighbor_counts: dict[str, dict[str, int]]
 
 
 class ExpandResponse(BaseModel):
-    """One page of a Stub node's hidden neighbours; `stub` is the continuation, null on the last page."""
+    """One page of a Stub node's hidden neighbors; `stub` is the continuation, null on the last page."""
     owner: str
     nodes: list[VisNode]  # depth is 1 relative to the owner
     edges: list[VisEdge]  # edges between the owner and the page

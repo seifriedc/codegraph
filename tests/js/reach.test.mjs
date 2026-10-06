@@ -11,12 +11,14 @@ const { parseHash, formatHash, DEFAULTS, ALL_DEPTH } = await load("state.js");
 const { fetchNeighborhood } = await load("api.js");
 const { depthOptions, ringText } = await load("reach.js");
 
-test("mode defaults to both and round-trips through the hash", () => {
-  assert.equal(DEFAULTS.mode, "both");
+test("mode defaults to neighborhood and round-trips through the hash", () => {
+  assert.equal(DEFAULTS.mode, "neighborhood");
+  assert.equal(parseHash("#mode=both").mode, "both");
+  assert.equal(parseHash("#mode=neighborhood").mode, "neighborhood");
   assert.equal(formatHash({ focus: "x", ...DEFAULTS }), "#focus=x");
   const s = { ...DEFAULTS, focus: "x", mode: "impact", depth: 3 };
   assert.deepEqual(parseHash(formatHash(s)), s);
-  assert.equal(parseHash("#mode=bogus").mode, "both");
+  assert.equal(parseHash("#mode=bogus").mode, "neighborhood");
 });
 
 test("depth 'all' maps to the server maximum and round-trips", () => {
@@ -37,8 +39,34 @@ test("ringText lists per-ring counts up to the depth, zero-filling", () => {
   assert.equal(ringText(null, 2), "");
 });
 
+test("ringText does not zero-fill rings that a truncated walk never reached", () => {
+  assert.equal(ringText({ 1: 30 }, 3, true), "1: 30 · deeper rings not counted");
+  assert.equal(ringText({ 1: 30 }, 3, false), "1: 30 · 2: 0 · 3: 0");
+});
+
 test("fetchNeighborhood sends mode", async () => {
   let seen;
   await fetchNeighborhood("a", { depth: 10, mode: "impact" }, async (u) => { seen = u; return { status: 404 }; });
   assert.equal(seen, "/api/neighborhood/a?depth=10&mode=impact");
+});
+
+test("direction and kinds are live URL keys, omitted at their defaults", () => {
+  const s = { ...DEFAULTS, focus: "x", direction: "in", kinds: ["calls", "contains"] };
+  assert.equal(formatHash(s), "#focus=x&direction=in&kinds=calls%2Ccontains");
+  assert.deepEqual(parseHash(formatHash(s)), s);
+  assert.equal(DEFAULTS.kinds, null);
+});
+
+test("the mode list offers neighborhood first and the direction control is only live there", async () => {
+  const { MODES, directionEnabled } = await load("reach.js");
+  assert.equal(MODES[0].value, "neighborhood");
+  assert.deepEqual(MODES.map((m) => m.value), ["neighborhood", "both", "impact", "dependencies"]);
+  assert.equal(directionEnabled("neighborhood"), true);
+  for (const m of ["both", "impact", "dependencies"]) assert.equal(directionEnabled(m), false);
+});
+
+test("fetchNeighborhood sends direction and kinds", async () => {
+  let seen;
+  await fetchNeighborhood("a", { depth: 2, mode: "neighborhood", direction: "in", kinds: ["calls"] }, async (u) => { seen = u; return { status: 404 }; });
+  assert.equal(seen, "/api/neighborhood/a?depth=2&direction=in&kinds=calls&mode=neighborhood");
 });

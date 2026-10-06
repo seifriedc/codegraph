@@ -99,7 +99,7 @@ test("the client enforces the node budget on expansion and keeps a stub for what
   assert.deepEqual(m.view().stubs.map((s) => [s.hidden, s.offset]), [[5, 2]]);
 });
 
-test("warning at the threshold and prune back to the focus neighbourhood", () => {
+test("warning at the threshold and prune back to the focus neighborhood", () => {
   const m = createModel({ ...BUDGET, warnAt: 4 });
   m.reset(base());
   assert.equal(m.overWarning(), false);
@@ -126,7 +126,7 @@ test("stub elements: labelled node plus a connecting edge, flagged for styling",
 test("status line reports totals, truncation, stubs and the 300-node warning", () => {
   const b = base();
   assert.equal(scaleStatus({ shown: 3, total: 3, truncated: false }), "Showing 3 nodes");
-  assert.match(scaleStatus({ shown: 150, total: 1204, truncated: true }), /150 of 1,204.*outer ring/);
+  assert.match(scaleStatus({ shown: 150, total: 1204, truncated: true }), /150 of at least 1,204.*outer ring/);
   assert.match(scaleStatus({ shown: 320, total: 320, truncated: false, expanded: true }), /320 nodes \(expanded\)/);
 });
 

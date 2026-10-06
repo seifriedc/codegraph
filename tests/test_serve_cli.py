@@ -32,6 +32,23 @@ def _free_port() -> int:
         return s.getsockname()[1]
 
 
+def _wait_until_listening(proc: subprocess.Popen, port: int, timeout: float = 30.0) -> None:
+    """Block until `port` accepts connections: bounded by `timeout`, and fails fast if the server exits."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.5):
+                return
+        except OSError:
+            pass
+        try:  # the pause between attempts; returns early (and fails) if the process died
+            code = proc.wait(timeout=0.1)
+        except subprocess.TimeoutExpired:
+            continue
+        raise AssertionError(f"serve exited early with code {code}")
+    raise AssertionError(f"serve did not listen on port {port} within {timeout}s")
+
+
 def test_serve_process_answers_root_and_stats(indexed_db):
     port = _free_port()
     proc = subprocess.Popen(
@@ -41,15 +58,8 @@ def test_serve_process_answers_root_and_stats(indexed_db):
     )
     try:
         base = f"http://127.0.0.1:{port}"
-        deadline = time.time() + 20
-        while True:
-            try:
-                stats = urllib.request.urlopen(f"{base}/api/stats", timeout=2).read()
-                break
-            except OSError:
-                if time.time() > deadline:
-                    raise
-                time.sleep(0.2)
+        _wait_until_listening(proc, port)
+        stats = urllib.request.urlopen(f"{base}/api/stats", timeout=10).read()
         assert b"total_nodes" in stats
         assert b"codegraph" in urllib.request.urlopen(f"{base}/").read()
     finally:

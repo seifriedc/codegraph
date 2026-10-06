@@ -6,18 +6,11 @@ from typing import Callable
 from fastapi import Depends, FastAPI, Query
 
 from codegraph.query import Graph
-from codegraph.vis.focus import shape_node
 from codegraph.vis.models import SearchHit, SearchResponse
-
-MAX_RESULTS = 20
-
-
-def _csv(value: str | None) -> list[str] | None:
-    items = [v for v in (value or "").split(",") if v]
-    return items or None
+from codegraph.vis.shape import MAX_SEARCH_RESULTS, Rel, csv_list, shape_node
 
 
-def register(app: FastAPI, get_graph: Callable, rel: Callable[[str | None], str | None]) -> None:
+def register(app: FastAPI, get_graph: Callable, rel: Rel) -> None:
     @app.get("/api/search", response_model=SearchResponse)
     def search(
         q: str = Query(..., min_length=1, description="substring; path is matched only if it contains / or ."),
@@ -25,7 +18,7 @@ def register(app: FastAPI, get_graph: Callable, rel: Callable[[str | None], str 
         languages: str | None = Query(None, description="comma-separated languages"),
         g: Graph = Depends(get_graph),
     ) -> dict:
-        r = g.search(q, kinds=_csv(kinds), languages=_csv(languages), limit=MAX_RESULTS)
+        r = g.search(q, kinds=csv_list(kinds), languages=csv_list(languages), limit=MAX_SEARCH_RESULTS)
         return {
             "nodes": [
                 SearchHit(**shape_node(n, rel).model_dump(), more_paths=max(n["file_count"] - 1, 0))

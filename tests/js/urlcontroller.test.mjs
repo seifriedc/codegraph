@@ -60,7 +60,7 @@ test("Back steps through focus, mode and group-by changes only", () => {
   assert.equal(ctl.state.depth, 3);
   assert.deepEqual(ctl.state.filters.hiddenNodeKinds, ["file"]);
   b.back();
-  assert.equal(ctl.state.mode, "both");
+  assert.equal(ctl.state.mode, "neighborhood");
   assert.equal(ctl.state.depth, 3);
 });
 

@@ -21,7 +21,7 @@ test("kind filters and stub expansions round-trip through the hash", () => {
 
 test("pan, zoom and positions are not part of the state", () => {
   assert.deepEqual(Object.keys(DEFAULTS).sort(), ["depth", "direction", "expanded", "externals", "filters",
-    "groupBy", "limit", "mode", "okinds", "stubs", "view"]);
+    "groupBy", "kinds", "limit", "mode", "okinds", "stubs", "view"]);
 });
 
 const base = { ...DEFAULTS, focus: "A", view: "focus" };
@@ -45,7 +45,7 @@ test("refetch only when the graph itself changes", () => {
   assert.equal(plan({ filters: { hiddenNodeKinds: ["file"], hiddenEdgeKinds: [] } }).refetch, false);
 });
 
-test("a change that reloads the neighbourhood forgets stub expansions", () => {
+test("a change that reloads the neighborhood forgets stub expansions", () => {
   const from = { ...base, stubs: ["s1"] };
   for (const patch of [{ focus: "B" }, { depth: 3 }, { mode: "impact" }, { limit: 300 }, { view: "type" }, { direction: "in" }]) {
     assert.deepEqual(plan(patch, from).state.stubs, [], JSON.stringify(patch));
