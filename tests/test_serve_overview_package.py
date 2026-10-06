@@ -1,4 +1,5 @@
 """Overview in Package mode (group_by=package) and the externals toggle, at the HTTP seam."""
+
 from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
@@ -36,21 +37,28 @@ def test_nested_packages_collapse_and_expand_via_contains(client):
     assert outer["member_count"] >= 3  # Outer, Inner, Ping (+ its file)
     assert "Inner" not in by_name(first, "package") and "Utils" not in by_name(first, "package")
 
-    second = client.get("/api/overview", params={**PKG, "expanded": [outer["id"], geometry["id"]]}).json()
+    second = client.get(
+        "/api/overview", params={**PKG, "expanded": [outer["id"], geometry["id"]]}
+    ).json()
     pk = by_name(second, "package")
     assert pk["Inner"]["parent"] == outer["id"] and pk["Utils"]["parent"] == geometry["id"]
     assert pk["Outer"]["expanded"] is True and pk["Inner"]["expanded"] is False
 
-    third = client.get("/api/overview", params={**PKG, "expanded": [outer["id"], pk["Inner"]["id"]]}).json()
-    members = {n["name"] for n in third["nodes"] if n["parent"] == pk["Inner"]["id"] and not n["group"]}
+    third = client.get(
+        "/api/overview", params={**PKG, "expanded": [outer["id"], pk["Inner"]["id"]]}
+    ).json()
+    members = {
+        n["name"] for n in third["nodes"] if n["parent"] == pk["Inner"]["id"] and not n["group"]
+    }
     assert "Ping" in members
     # the Package's own node is the Group, never repeated as a member
     assert "Inner" not in members
 
 
 def test_aggregate_edges_roll_up_to_packages(client):
-    body = client.get("/api/overview", params={"group_by": "package", "kinds": "imports",
-                                               "externals": "true"}).json()
+    body = client.get(
+        "/api/overview", params={"group_by": "package", "kinds": "imports", "externals": "true"}
+    ).json()
     ids = {n["id"]: n for n in body["nodes"]}
     ext = next(n for n in body["nodes"] if n["kind"] == "external")
     geo = by_name(body, "package")["Geometry"]
@@ -67,6 +75,8 @@ def test_externals_hidden_by_default_and_one_external_group_when_shown(client, g
     assert len(externals) == 1 and externals[0]["group"] and externals[0]["parent"] is None
     assert externals[0]["member_count"] > 0
     # drilling in lists the placeholders, in both groupings
-    drilled = client.get("/api/overview", params={"group_by": group_by, "externals": "true",
-                                                  "expanded": [externals[0]["id"]]}).json()
+    drilled = client.get(
+        "/api/overview",
+        params={"group_by": group_by, "externals": "true", "expanded": [externals[0]["id"]]},
+    ).json()
     assert "Sqrt" in {n["name"] for n in drilled["nodes"] if n["parent"] == "external"}

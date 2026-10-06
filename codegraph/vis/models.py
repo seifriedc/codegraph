@@ -1,4 +1,5 @@
 """Pydantic models: the JSON contract between the vis API and the UI."""
+
 from __future__ import annotations
 
 from pydantic import BaseModel
@@ -38,6 +39,7 @@ class VisStub(BaseModel):
 
     `offset` is how many of that group are already shown; pass it to /api/expand to page in more.
     """
+
     id: str
     owner: str
     direction: str  # "in" | "out"
@@ -48,6 +50,7 @@ class VisStub(BaseModel):
 
 class NeighborhoodResponse(BaseModel):
     """Shared graph-response shape: nodes, edges, truncated, total (plus the focus id)."""
+
     focus: str
     nodes: list[VisNode]
     edges: list[VisEdge]
@@ -60,6 +63,7 @@ class NeighborhoodResponse(BaseModel):
 
 class OverviewNode(VisNode):
     """A Group (group=True; id may be derived, e.g. a directory) or a member of an expanded Group."""
+
     group: bool
     parent: str | None  # id of the enclosing expanded Group (Cytoscape compound parent)
     expanded: bool
@@ -69,6 +73,7 @@ class OverviewNode(VisNode):
 
 class OverviewEdge(BaseModel):
     """Aggregate edge: derived, one per directed pair of visible items."""
+
     id: str
     source_id: str
     target_id: str
@@ -94,6 +99,7 @@ class NodeDetail(VisNode):
 
 class ExpandResponse(BaseModel):
     """One page of a Stub node's hidden neighbors; `stub` is the continuation, null on the last page."""
+
     owner: str
     nodes: list[VisNode]  # depth is 1 relative to the owner
     edges: list[VisEdge]  # edges between the owner and the page
@@ -107,6 +113,7 @@ class SearchHit(VisNode):
 
 class SearchResponse(BaseModel):
     """Shared response shape: nodes, truncated, total."""
+
     nodes: list[SearchHit]
     truncated: bool
     total: int

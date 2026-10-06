@@ -18,7 +18,6 @@ _DB_OPTION = typer.Option(Path(".codegraph.db"), "--db", help="Path to .duckdb f
 
 def _resolve_or_exit(g, identifier: str):
     """Resolve a node ID or qualified name, exiting with an error if not found."""
-    from codegraph.query import Graph
     node = g.resolve_node(identifier)
     if node is None:
         typer.echo(f"Error: node not found: {identifier!r}", err=True)
@@ -28,7 +27,9 @@ def _resolve_or_exit(g, identifier: str):
 
 @app.command()
 def index(
-    path: Path = typer.Argument(default=Path("."), help="Directory to index (default: current directory)"),
+    path: Path = typer.Argument(
+        default=Path("."), help="Directory to index (default: current directory)"
+    ),
     db: Path = _DB_OPTION,
 ) -> None:
     """Walk a source tree and build the knowledge graph."""
@@ -160,13 +161,19 @@ def query_demographics(
 
     typer.echo(f"Codebase demographics — {db}")
     typer.echo("=" * 40)
-    typer.echo(f"Files: {report['total_files']}   Nodes: {report['total_nodes']}   Edges: {report['total_edges']}")
+    typer.echo(
+        f"Files: {report['total_files']}   Nodes: {report['total_nodes']}   Edges: {report['total_edges']}"
+    )
     typer.echo(f"Lines: {report['total_lines']}   SLOC: {report['total_sloc']}")
 
     typer.echo("\nBy language:")
-    for language, entry in sorted(report["by_language"].items(), key=lambda kv: (kv[0] is None, kv[0])):
+    for language, entry in sorted(
+        report["by_language"].items(), key=lambda kv: (kv[0] is None, kv[0])
+    ):
         label = language or "(unknown)"
-        typer.echo(f"  {label:<10} {entry['files']:>5} files   {entry['lines']:>7} lines   {entry['sloc']:>7} sloc")
+        typer.echo(
+            f"  {label:<10} {entry['files']:>5} files   {entry['lines']:>7} lines   {entry['sloc']:>7} sloc"
+        )
 
     typer.echo("\nNodes by kind:")
     for kind, count in report["nodes_by_kind"].items():
@@ -190,8 +197,9 @@ def graph_add_node(
     from codegraph.indexer import Indexer
 
     idx = Indexer(db)
-    nid = idx.add_node(kind=kind, name=name, language=language,
-                       qualified_name=qualified_name, file_path=file_path)
+    nid = idx.add_node(
+        kind=kind, name=name, language=language, qualified_name=qualified_name, file_path=file_path
+    )
     idx.close()
     typer.echo(nid)
 
@@ -214,8 +222,9 @@ def graph_add_edge(
     source_id = _resolve_or_exit(g, source)["id"]
     target_id = _resolve_or_exit(g, target)["id"]
     idx = Indexer(db)
-    eid = idx.add_edge(kind=kind, source_id=source_id, target_id=target_id,
-                       file_path=file_path, line=line, col=col)
+    eid = idx.add_edge(
+        kind=kind, source_id=source_id, target_id=target_id, file_path=file_path, line=line, col=col
+    )
     idx.close()
     typer.echo(eid)
 
@@ -236,7 +245,7 @@ def ast_dump(
         typer.echo(dump_ast(file, named_only=named_only))
     except ValueError as exc:
         typer.echo(f"Error: {exc}", err=True)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
 
 @ast_app.command("query")
@@ -246,7 +255,9 @@ def ast_query_cmd(
     db: Path = _DB_OPTION,
     language: Optional[str] = _LANG_OPTION,
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Warn when pattern is skipped for a language"),
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="Warn when pattern is skipped for a language"
+    ),
 ) -> None:
     """Run a tree-sitter S-expression pattern across source files."""
     from codegraph.ast_query import query_files, resolve_files, format_match, _match_to_dict
@@ -260,7 +271,7 @@ def ast_query_cmd(
         matches = list(query_files(pattern, files, language=language, verbose=verbose))
     except ValueError as exc:
         typer.echo(f"Error: {exc}", err=True)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
     if json_output:
         typer.echo(json.dumps([_match_to_dict(m) for m in matches], indent=2, default=str))
@@ -292,7 +303,9 @@ def ast_shell_cmd(
 @app.command()
 def serve(
     db: Path = _DB_OPTION,
-    host: str = typer.Option("127.0.0.1", "--host", help="Interface to bind (local only by default)"),
+    host: str = typer.Option(
+        "127.0.0.1", "--host", help="Interface to bind (local only by default)"
+    ),
     port: int = typer.Option(8000, "--port", help="Port to listen on"),
 ) -> None:
     """Serve a read-only web UI over an indexed database.

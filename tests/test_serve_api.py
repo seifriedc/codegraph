@@ -1,5 +1,7 @@
 """Integration tests at the HTTP API seam: TestClient over a fixture-indexed temp DB."""
+
 from __future__ import annotations
+import duckdb
 import pytest
 from fastapi.testclient import TestClient
 
@@ -15,7 +17,9 @@ def client(indexed_db):
 
 def test_stats_reports_counts_for_indexed_fixtures(client):
     body = client.get("/api/stats").json()
-    expected_files = len([f for f in FIXTURES.rglob("*") if f.suffix in {".ads", ".adb", ".c", ".cpp"}])
+    expected_files = len(
+        [f for f in FIXTURES.rglob("*") if f.suffix in {".ads", ".adb", ".c", ".cpp"}]
+    )
     assert body["total_files"] == expected_files
     assert body["total_nodes"] > 0 and body["total_edges"] > 0
     assert set(body["nodes_by_language"]) >= {"ada", "c", "cpp"}
@@ -58,7 +62,7 @@ def test_two_servers_share_one_database(indexed_db):
 
 
 def test_missing_database_fails_at_startup(tmp_path):
-    with pytest.raises(Exception):
+    with pytest.raises(duckdb.IOException):
         create_app(tmp_path / "nope.duckdb")
 
 

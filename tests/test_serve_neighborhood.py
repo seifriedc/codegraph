@@ -1,4 +1,5 @@
 """Integration tests at the HTTP API seam: /api/neighborhood and /api/node."""
+
 from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
@@ -31,20 +32,34 @@ def test_neighborhood_returns_shared_graph_shape(client):
     assert body["total"] == len(body["nodes"])
     focus = next(n for n in body["nodes"] if n["id"] == SHAPE)
     assert focus["depth"] == 0 and focus["kind"] == "class" and focus["language"] == "cpp"
-    assert {"id", "kind", "name", "qualified_name", "path", "line_start", "line_end",
-            "language", "depth", "external"} <= set(focus)
+    assert {
+        "id",
+        "kind",
+        "name",
+        "qualified_name",
+        "path",
+        "line_start",
+        "line_end",
+        "language",
+        "depth",
+        "external",
+    } <= set(focus)
     assert {"id", "kind", "source_id", "target_id"} <= set(body["edges"][0])
 
 
 def test_inbound_inherits_gives_the_type_hierarchy_children(client):
-    body = client.get(f"/api/neighborhood/{SHAPE}", params={"direction": "in", "kinds": "inherits"}).json()
+    body = client.get(
+        f"/api/neighborhood/{SHAPE}", params={"direction": "in", "kinds": "inherits"}
+    ).json()
     assert qnames(body) == {"Shape", "Circle", "Rectangle"}
     assert {n["depth"] for n in body["nodes"] if n["qualified_name"] != "Shape"} == {1}
     assert {e["kind"] for e in body["edges"]} == {"inherits"}
 
 
 def test_outbound_direction_from_a_child_reaches_its_parent(client):
-    body = client.get(f"/api/neighborhood/{CIRCLE}", params={"direction": "out", "kinds": "inherits"}).json()
+    body = client.get(
+        f"/api/neighborhood/{CIRCLE}", params={"direction": "out", "kinds": "inherits"}
+    ).json()
     assert qnames(body) == {"Circle", "Shape"}
 
 
@@ -76,7 +91,10 @@ def test_depth_above_server_maximum_is_rejected(client):
 
 
 def test_bad_direction_is_rejected(client):
-    assert client.get(f"/api/neighborhood/{SHAPE}", params={"direction": "sideways"}).status_code == 422
+    assert (
+        client.get(f"/api/neighborhood/{SHAPE}", params={"direction": "sideways"}).status_code
+        == 422
+    )
 
 
 def test_unknown_node_is_404(client):
@@ -99,8 +117,9 @@ def test_paths_are_relative_to_common_ancestor_of_indexed_files(client):
 
 
 def test_external_placeholders_are_flagged(client):
-    body = client.get(f"/api/neighborhood/{stable_id('function:ada:Geometry.Distance')}",
-                      params={"depth": 2}).json()
+    body = client.get(
+        f"/api/neighborhood/{stable_id('function:ada:Geometry.Distance')}", params={"depth": 2}
+    ).json()
     ext = {n["qualified_name"] for n in body["nodes"] if n["external"]}
     assert "Ada.Numerics.Elementary_Functions.Sqrt" in ext
     assert not any(n["external"] for n in body["nodes"] if n["kind"] == "file")
@@ -121,9 +140,12 @@ def test_node_detail_lists_every_defining_file(client):
 
 def test_every_script_and_module_the_page_references_is_served(client):
     import re
+
     html = client.get("/").text
     srcs = re.findall(r'<script[^>]+src="([^"]+)"', html)
-    assert "vendor/cytoscape.min.js" in srcs and "vendor/d3-force.min.js" in srcs and "main.js" in srcs
+    assert (
+        "vendor/cytoscape.min.js" in srcs and "vendor/d3-force.min.js" in srcs and "main.js" in srcs
+    )
     seen, todo = set(), list(srcs)
     while todo:
         src = todo.pop()
@@ -134,11 +156,23 @@ def test_every_script_and_module_the_page_references_is_served(client):
         assert r.status_code == 200, src
         if src.endswith(".js") and not src.startswith("vendor/"):  # follow relative ES imports
             todo += [m[2:] for m in re.findall(r'from "(\./[^"]+)"', r.text)]
-    assert {"api.js", "state.js", "canvas.js", "layout.js", "elements.js", "panel.js", "style.js", "scale.js", "scale-style.js"} <= seen
+    assert {
+        "api.js",
+        "state.js",
+        "canvas.js",
+        "layout.js",
+        "elements.js",
+        "panel.js",
+        "style.js",
+        "scale.js",
+        "scale-style.js",
+    } <= seen
 
 
 def test_neighbor_counts_match_the_neighborhood_edges(client):
     node = client.get(f"/api/node/{SHAPE}").json()
     hood = client.get(f"/api/neighborhood/{SHAPE}").json()
-    inherits_in = {e["source_id"] for e in hood["edges"] if e["kind"] == "inherits" and e["target_id"] == SHAPE}
+    inherits_in = {
+        e["source_id"] for e in hood["edges"] if e["kind"] == "inherits" and e["target_id"] == SHAPE
+    }
     assert len(inherits_in) == node["neighbor_counts"]["in"]["inherits"]

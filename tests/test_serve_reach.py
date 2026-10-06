@@ -1,4 +1,5 @@
 """Integration tests: Impact set / Dependencies modes of /api/neighborhood, on the fixtures."""
+
 from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
@@ -55,7 +56,9 @@ def test_both_is_impact_union_dependencies(client):
     imp = get(client, CIRCLE, mode="impact", depth=2)
     dep = get(client, CIRCLE, mode="dependencies", depth=2)
     both = get(client, CIRCLE, mode="both", depth=2)
-    assert {n["id"] for n in both["nodes"]} == {n["id"] for n in imp["nodes"]} | {n["id"] for n in dep["nodes"]}
+    assert {n["id"] for n in both["nodes"]} == {n["id"] for n in imp["nodes"]} | {
+        n["id"] for n in dep["nodes"]
+    }
 
 
 def test_ring_counts_are_reported_per_depth(client):
@@ -86,7 +89,10 @@ def test_bad_mode_is_rejected(client):
 
 def test_depth_all_is_the_server_maximum_and_above_is_rejected(client):
     assert get(client, SHAPE, mode="impact", depth=10)["focus"] == SHAPE
-    assert client.get(f"/api/neighborhood/{SHAPE}", params={"mode": "impact", "depth": 11}).status_code == 422
+    assert (
+        client.get(f"/api/neighborhood/{SHAPE}", params={"mode": "impact", "depth": 11}).status_code
+        == 422
+    )
 
 
 def test_unknown_node_is_404_in_a_mode(client):

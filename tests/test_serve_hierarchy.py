@@ -1,4 +1,5 @@
 """Integration tests at the HTTP API seam: /api/hierarchy (mode=type|declaration)."""
+
 from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
@@ -31,7 +32,9 @@ def test_type_hierarchy_of_the_root_returns_its_descendants_with_inherits_edges(
     assert qnames(body) == {"Shape", "Circle", "Rectangle"}
     # edges point child -> parent, so dagre puts the parent on top
     assert {(e["source_id"], e["target_id"], e["kind"]) for e in body["edges"]} == {
-        (CIRCLE, SHAPE, "inherits"), (RECTANGLE, SHAPE, "inherits")}
+        (CIRCLE, SHAPE, "inherits"),
+        (RECTANGLE, SHAPE, "inherits"),
+    }
     assert body["truncated"] is False and body["total"] == 3
 
 

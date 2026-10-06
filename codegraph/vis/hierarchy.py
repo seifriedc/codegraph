@@ -5,6 +5,7 @@ direction: type mode is child -> parent (`inherits`), declaration mode is contai
 (`contains`/`defines`). The UI lays out the declaration mode top to bottom as-is and flips
 type mode (parent on top). Over the limit the deepest ring is dropped first.
 """
+
 from __future__ import annotations
 
 from typing import Callable, Literal

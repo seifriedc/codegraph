@@ -1,4 +1,5 @@
 """Graph.neighborhood and its sibling detail primitives, on small hand-built graphs."""
+
 from __future__ import annotations
 import pytest
 
@@ -11,7 +12,10 @@ def chain(tmp_path):
     """e -calls-> a -calls-> b -calls-> c -calls-> d;  a -inherits-> x;  a -calls-> c (shortcut)."""
     db = tmp_path / "chain.duckdb"
     idx = Indexer(db)
-    ids = {n: idx.add_node("function", n, "cpp", qualified_name=n, file_path=f"/r/{n}.cpp") for n in "abcdex"}
+    ids = {
+        n: idx.add_node("function", n, "cpp", qualified_name=n, file_path=f"/r/{n}.cpp")
+        for n in "abcdex"
+    }
     for s, t in ["ea", "ab", "bc", "cd", "ac"]:
         idx.add_edge("calls", ids[s], ids[t])
     idx.add_edge("inherits", ids["a"], ids["x"])

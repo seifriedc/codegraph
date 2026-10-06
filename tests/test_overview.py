@@ -1,4 +1,5 @@
 """Graph.overview: Groups and derived Aggregate edges, on a small hand-built graph."""
+
 from __future__ import annotations
 import pytest
 
@@ -17,17 +18,32 @@ def repo(tmp_path):
     idx = Indexer(db)
     ids = {}
     for path in ["core/a.cpp", "core/b.cpp", "ui/c.cpp", "top.cpp"]:
-        ids[path] = idx.add_node("file", path.split("/")[-1], "cpp", qualified_name=f"/r/{path}",
-                                 file_path=f"/r/{path}")
-    members = {"a1": "core/a.cpp", "a2": "core/a.cpp", "b1": "core/b.cpp",
-               "c1": "ui/c.cpp", "c2": "ui/c.cpp", "t1": "top.cpp"}
+        ids[path] = idx.add_node(
+            "file", path.split("/")[-1], "cpp", qualified_name=f"/r/{path}", file_path=f"/r/{path}"
+        )
+    members = {
+        "a1": "core/a.cpp",
+        "a2": "core/a.cpp",
+        "b1": "core/b.cpp",
+        "c1": "ui/c.cpp",
+        "c2": "ui/c.cpp",
+        "t1": "top.cpp",
+    }
     for name, path in members.items():
-        ids[name] = idx.add_node("function", name, "cpp", qualified_name=name, file_path=f"/r/{path}")
+        ids[name] = idx.add_node(
+            "function", name, "cpp", qualified_name=name, file_path=f"/r/{path}"
+        )
         idx.add_edge("contains", ids[path], ids[name])
     ids["math.h"] = idx.add_node("module", "math.h", "cpp", qualified_name="math.h")
-    for kind, s, t in [("calls", "a1", "c1"), ("calls", "a2", "c1"), ("references", "a1", "c2"),
-                       ("calls", "c1", "b1"), ("calls", "b1", "a1"), ("calls", "a1", "a2"),
-                       ("imports", "t1", "math.h")]:
+    for kind, s, t in [
+        ("calls", "a1", "c1"),
+        ("calls", "a2", "c1"),
+        ("references", "a1", "c2"),
+        ("calls", "c1", "b1"),
+        ("calls", "b1", "a1"),
+        ("calls", "a1", "a2"),
+        ("imports", "t1", "math.h"),
+    ]:
         idx.add_edge(kind, ids[s], ids[t])
     idx.close()
     g = Graph(db)

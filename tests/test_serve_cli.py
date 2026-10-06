@@ -1,5 +1,7 @@
 """`codegraph serve` command: help text, and a real server process answering HTTP."""
+
 from __future__ import annotations
+import re
 import socket
 import subprocess
 import sys
@@ -10,6 +12,8 @@ from typer.testing import CliRunner
 
 from codegraph.cli import app
 
+ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
+
 
 def test_serve_is_documented_in_cli_help():
     runner = CliRunner()
@@ -17,8 +21,10 @@ def test_serve_is_documented_in_cli_help():
     assert "serve" in top.output
     result = runner.invoke(app, ["serve", "--help"])
     assert result.exit_code == 0
+    # Typer forces ANSI styling under GITHUB_ACTIONS/FORCE_COLOR at import time.
+    output = ANSI_ESCAPE.sub("", result.output)
     for text in ("--db", "--port", "--host", "read-only"):
-        assert text in result.output
+        assert text in output
 
 
 def test_serve_exits_with_error_for_missing_db(tmp_path):
@@ -52,9 +58,18 @@ def _wait_until_listening(proc: subprocess.Popen, port: int, timeout: float = 30
 def test_serve_process_answers_root_and_stats(indexed_db):
     port = _free_port()
     proc = subprocess.Popen(
-        [sys.executable, "-c", "from codegraph.cli import app; app()", "serve",
-         "--db", str(indexed_db), "--port", str(port)],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        [
+            sys.executable,
+            "-c",
+            "from codegraph.cli import app; app()",
+            "serve",
+            "--db",
+            str(indexed_db),
+            "--port",
+            str(port),
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
     try:
         base = f"http://127.0.0.1:{port}"

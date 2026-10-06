@@ -2,7 +2,7 @@ from __future__ import annotations
 from pathlib import Path
 from tree_sitter import Node as TSNode
 
-from codegraph.models import Node, Edge, stable_id, random_id
+from codegraph.models import Node, Edge, stable_id
 
 
 def make_file_node(path: Path, language: str) -> Node:
@@ -19,7 +19,7 @@ def make_file_node(path: Path, language: str) -> Node:
 
 
 def node_text(node: TSNode, source: bytes) -> str:
-    return source[node.start_byte:node.end_byte].decode("utf-8", errors="replace").strip()
+    return source[node.start_byte : node.end_byte].decode("utf-8", errors="replace").strip()
 
 
 def contains_edge(parent: Node, child: Node, file_path: str, ts_node: TSNode) -> Edge:
