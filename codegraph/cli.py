@@ -287,3 +287,25 @@ def ast_shell_cmd(
         raise typer.Exit(1)
 
     run_repl(files, language=language, verbose=verbose)
+
+
+@app.command()
+def serve(
+    db: Path = _DB_OPTION,
+    host: str = typer.Option("127.0.0.1", "--host", help="Interface to bind (local only by default)"),
+    port: int = typer.Option(8000, "--port", help="Port to listen on"),
+) -> None:
+    """Serve a read-only web UI over an indexed database.
+
+    The database is opened read-only, so several `serve` processes (or browser
+    tabs) can share one file, but `codegraph index` must not run concurrently.
+    """
+    import uvicorn
+
+    from codegraph.vis.app import create_app
+
+    if not db.exists():
+        typer.echo(f"Error: database not found: {db}", err=True)
+        raise typer.Exit(1)
+    typer.echo(f"Serving {db} at http://{host}:{port}")
+    uvicorn.run(create_app(db), host=host, port=port, log_level="warning")

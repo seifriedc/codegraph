@@ -45,8 +45,14 @@ def _count_loc_sloc(file_path: str | None, language: str | None) -> tuple[int, i
 class Graph:
     """Read-only query interface over an indexed codegraph database."""
 
-    def __init__(self, db_path: str | Path):
-        self.conn = connect(db_path)
+    def __init__(self, db_path: str | Path, read_only: bool = False):
+        self.conn = connect(db_path, read_only=read_only)
+
+    def cursor(self) -> "Graph":
+        """A Graph on a new cursor of this connection, for use in one thread/request."""
+        g = Graph.__new__(Graph)
+        g.conn = self.conn.cursor()
+        return g
 
     # ── Low-level helpers ─────────────────────────────────────────────────────
 

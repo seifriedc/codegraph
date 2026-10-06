@@ -50,7 +50,10 @@ _INSERT_EDGE = """
 """
 
 
-def connect(db_path: str | Path) -> duckdb.DuckDBPyConnection:
+def connect(db_path: str | Path, read_only: bool = False) -> duckdb.DuckDBPyConnection:
+    """Open the database. Read-only opens skip DDL and can be shared across processes."""
+    if read_only:
+        return duckdb.connect(str(db_path), read_only=True)
     conn = duckdb.connect(str(db_path))
     for ddl in _DDL:
         conn.execute(ddl)
