@@ -3,6 +3,8 @@
 import { fetchExpand, fetchHierarchy, fetchNeighborhood, fetchNode, fetchSearch } from "./api.js";
 import { HIERARCHY_MODES } from "./hierarchy_layout.js";
 import { createCanvas } from "./canvas.js";
+import { defaultFilters, toggleEdgeKind, toggleNodeKind } from "./filters.js";
+import { countKinds, legendModel, miniLegendModel, renderLegend, renderMiniLegend } from "./legend.js";
 import { renderPanel } from "./panel.js";
 import { BUDGET, createModel, nextLimit, scaleStatus } from "./scale.js";
 import { depthOptions, MODES, ringText } from "./reach.js";
@@ -28,6 +30,8 @@ const model = createModel(); // focus neighbourhood + accumulated expansions (sc
 let layeredView = false; // hierarchy views have no expansion
 let baseHood = null; // the last focus-view response (truncated/total for the status line)
 const expanding = new Set();
+let filters = defaultFilters(); // kind filters (legend); the URL-state ticket persists these via filtersToParams
+let counts = { nodes: {}, edges: {} };
 let requestSeq = 0; // ignore responses that arrive after a newer request
 
 function setState(patch, { push = false } = {}) {
@@ -39,6 +43,15 @@ function setState(patch, { push = false } = {}) {
     else history.replaceState(null, "", hash || location.pathname);
   }
   if (!push) render();
+}
+
+function drawLegends() {
+  renderLegend($("legend"), legendModel(filters, counts), {
+    // Filters are client-side visibility toggles (the server's `mode` overrides the `kinds` param).
+    onToggleNode: (k) => { filters = toggleNodeKind(filters, k); canvas.setFilters(filters); drawLegends(); },
+    onToggleEdge: (k) => { filters = toggleEdgeKind(filters, k); canvas.setFilters(filters); drawLegends(); },
+  });
+  renderMiniLegend($("mini-legend"), miniLegendModel(filters, counts));
 }
 
 async function render() {
@@ -85,6 +98,8 @@ async function render() {
 /** Status line, raise-limit control, undo button and the 300-node warning, from the model. */
 function updateScaleUi() {
   if (!baseHood) return;
+  counts = countKinds(layeredView ? baseHood : model.view());
+  drawLegends();
   $("status").textContent = scaleStatus({
     shown: layeredView ? baseHood.nodes.length : model.size, total: baseHood.total,
     truncated: baseHood.truncated, expanded: !layeredView && model.canUndo(),
@@ -135,6 +150,7 @@ $("prune").addEventListener("click", () => {
 $("recenter").addEventListener("click", () => canvas.recenter());
 addEventListener("hashchange", () => { state = parseHash(location.hash); render(); });
 
+drawLegends();
 let storage;
 try { storage = window.localStorage; } catch { storage = undefined; } // even reading it can throw
 export const search = mountSearch($("search"), {
