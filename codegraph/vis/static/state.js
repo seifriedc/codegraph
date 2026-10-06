@@ -4,13 +4,13 @@
 // `view` picks the screen. With a focus node it defaults to "focus"; with none it is "overview", the
 // landing view. (DEFAULTS.view is the focus-side default; `derivedView` applies the landing rule.)
 // Overview-only keys: `expanded` (repeated `expanded=<group id>`), `okinds` (edge kinds; absent = server
-// default, which leaves `calls` off), `groupby` ("directory"; ticket 25 appends "package" to GROUP_BYS).
+// default, which leaves `calls` off), `groupby` ("directory" | "package"), `externals` (`externals=1` shows the external Group; hidden by default).
 
 import { BUDGET, clampLimit } from "./scale.js";
 
 export const DEFAULTS = Object.freeze({
   depth: 2, direction: "both", mode: "both", view: "focus", limit: BUDGET.defaultLimit,
-  expanded: Object.freeze([]), okinds: null, groupBy: "directory",
+  expanded: Object.freeze([]), okinds: null, groupBy: "directory", externals: false,
 });
 export const MAX_UI_DEPTH = 5;
 export const ALL_DEPTH = 10; // "all" in the UI: the server's maximum depth
@@ -18,7 +18,7 @@ export const DIRECTIONS = ["both", "in", "out"];
 // overview = Groups + Aggregate edges; focus = neighborhood/reach; type|declaration = hierarchies
 export const VIEWS = ["overview", "focus", "type", "declaration"];
 export const MODES = ["both", "impact", "dependencies"]; // Impact set / Dependencies / union
-export const GROUP_BYS = ["directory"]; // ticket 25 appends "package"
+export const GROUP_BYS = ["directory", "package"];
 
 /** The view implied by the hash when `view` is absent: focus when a Focus node is given, else the overview. */
 export const derivedView = (focus) => (focus ? DEFAULTS.view : "overview");
@@ -43,6 +43,7 @@ export function parseHash(hash) {
     expanded: p.getAll("expanded"),
     okinds: p.has("okinds") ? p.get("okinds").split(",").filter(Boolean) : null,
     groupBy: GROUP_BYS.includes(groupBy) ? groupBy : DEFAULTS.groupBy,
+    externals: p.get("externals") === "1",
   };
 }
 
@@ -58,6 +59,7 @@ export function formatHash(state) {
   for (const id of state.expanded || []) p.append("expanded", id);
   if (state.okinds) p.set("okinds", state.okinds.join(","));
   if (state.groupBy && state.groupBy !== DEFAULTS.groupBy) p.set("groupby", state.groupBy);
+  if (state.externals) p.set("externals", "1");
   const s = p.toString();
   return s ? "#" + s : "";
 }

@@ -70,6 +70,13 @@
     <div id="search" class="search"></div>
     <button id="ov-home" type="button" class="focus-only" title="Back to the overview">Overview</button>
     <span id="ov-controls" class="overview-only">
+      <label>Group by
+        <select id="ov-groupby" title="Directory: directories and files. Package: Ada Packages; files for C and C++">
+          <option value="directory">Directory</option>
+          <option value="package">Package</option>
+        </select>
+      </label>
+      <label title="Show external placeholders as one Group"><input id="ov-externals" type="checkbox"> externals</label>
       <span id="ov-kinds" title="Edge kinds counted in Aggregate edges"></span>
       <span id="ov-selection" class="muted"></span>
       <button id="ov-focus" type="button" disabled title="Open the selected node in the focus view">Focus</button>

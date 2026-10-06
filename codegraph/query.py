@@ -527,7 +527,15 @@ class Graph:
         return {"groups": out_groups, "nodes": members, "edges": edges,
                 "truncated": False, "total": len(out_groups) + len(members)}
 
-    _GROUPINGS = {"directory": "_directory_grouping"}
+    _GROUPINGS = {"directory": "_directory_grouping", "package": "_package_grouping"}
+
+    @staticmethod
+    def _external_group(groups: dict[str, dict]) -> str:
+        """The single `external` Group (created on first use); shared by every grouping."""
+        groups.setdefault("external", {"id": "external", "kind": "external", "name": "external",
+                                       "qualified_name": None, "file_path": None,
+                                       "node_id": None, "parent": None})
+        return "external"
 
     def _directory_grouping(self, externals: bool) -> "_Grouping":
         """Directories (derived, id `dir:<abs path>`) > files > member nodes.
@@ -562,11 +570,76 @@ class Graph:
             if f is not None:
                 placement[r["id"]] = f["id"]
             elif externals and r["kind"] != "file":
-                if "external" not in groups:
-                    groups["external"] = {"id": "external", "kind": "external", "name": "external",
-                                          "qualified_name": None, "file_path": None,
-                                          "node_id": None, "parent": None}
-                placement[r["id"]] = "external"
+                placement[r["id"]] = self._external_group(groups)
+        return _Grouping(groups, placement)
+
+    def _package_grouping(self, externals: bool) -> "_Grouping":
+        """Packages (nested via `contains`) are the Groups; anything outside a Package is
+        grouped by its file (C and C++ have no Package nodes, so files are the Groups).
+
+        Mixed repos: a node goes in its innermost containing Package, else in its file's
+        Group. A file node goes in the Package its file contains (so `imports` edges from
+        an Ada file attach to that Package) unless the file also has nodes outside any
+        Package, in which case it is their file Group. External placeholders (no
+        `file_path`, including external Packages) go in one `external` Group when
+        `externals`.
+        """
+        rows = self._fetchall("SELECT id, kind, name, qualified_name, file_path FROM nodes")
+        by_id = {r["id"]: r for r in rows}
+        children: dict[str, list[str]] = {}
+        for p, c in self.conn.execute(
+                "SELECT source_id, target_id FROM edges WHERE kind = 'contains'").fetchall():
+            children.setdefault(p, []).append(c)
+        pkgs = {r["id"]: r for r in rows if r["kind"] == "package" and r["file_path"]}
+        files = {r["file_path"]: r for r in rows if r["kind"] == "file" and r["file_path"]}
+
+        groups: dict[str, dict] = {
+            pid: {"id": pid, "kind": "package", "name": r["name"],
+                  "qualified_name": r["qualified_name"], "file_path": r["file_path"],
+                  "node_id": pid, "parent": None}
+            for pid, r in sorted(pkgs.items(), key=lambda kv: kv[1]["qualified_name"] or "")}
+        placement: dict[str, str] = {pid: pid for pid in pkgs}
+        owner_file: dict[str, str] = {}  # file node id -> first top-level Package it contains
+        for pid in groups:
+            stack = list(children.get(pid, []))
+            while stack:
+                n = stack.pop()
+                if n in placement and n != pid:
+                    if n in pkgs:  # nested Package: becomes a child Group, don't descend here
+                        groups[n]["parent"] = pid
+                    continue
+                if n in by_id:
+                    placement[n] = pid
+                    stack.extend(children.get(n, []))
+        # a file node's Package: the Package it directly contains
+        for r in files.values():
+            fid = r["id"]
+            top = [c for c in children.get(fid, []) if c in pkgs]
+            if top:
+                owner_file[fid] = min(top, key=lambda c: pkgs[c]["qualified_name"] or "")
+
+        def file_group(path: str) -> str:
+            f = files[path]
+            groups.setdefault(f["id"], {"id": f["id"], "kind": "file", "name": f["name"],
+                                        "qualified_name": f["qualified_name"], "file_path": path,
+                                        "node_id": f["id"], "parent": None})
+            return f["id"]
+
+        for r in rows:
+            nid = r["id"]
+            if nid in placement or r["kind"] == "file":
+                continue
+            if r["file_path"] in files:
+                placement[nid] = file_group(r["file_path"])
+            elif externals:
+                placement[nid] = self._external_group(groups)
+        for path, f in files.items():
+            if f["id"] in groups:
+                placement[f["id"]] = f["id"]
+            elif f["id"] in owner_file:
+                placement[f["id"]] = owner_file[f["id"]]
+            else:
+                placement[f["id"]] = file_group(path)
         return _Grouping(groups, placement)
 
     # ── High-level queries ────────────────────────────────────────────────────

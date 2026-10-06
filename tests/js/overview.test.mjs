@@ -102,3 +102,19 @@ test("every view value round-trips through parseHash/formatHash", async () => {
     assert.equal(back.focus, focus);
   }
 });
+
+test("group_by 'package' and the externals toggle round-trip through the hash", () => {
+  const s = { ...DEFAULTS, focus: null, view: "overview", groupBy: "package", externals: true, expanded: ["p-1"] };
+  assert.equal(formatHash(s), "#expanded=p-1&groupby=package&externals=1");
+  assert.deepEqual(parseHash(formatHash(s)), s);
+  assert.equal(parseHash("#groupby=galaxy").groupBy, "directory", "unknown value falls back");
+  assert.equal(parseHash("").externals, false, "externals are hidden by default");
+  assert.equal(formatHash({ ...DEFAULTS, focus: null, view: "overview" }), "");
+});
+
+test("fetchOverview sends group_by and externals", async () => {
+  let url;
+  const fake = async (u) => { url = u; return { ok: true, status: 200, json: async () => ({}) }; };
+  await fetchOverview({ groupBy: "package", externals: true }, fake);
+  assert.equal(url, "/api/overview?group_by=package&externals=true");
+});

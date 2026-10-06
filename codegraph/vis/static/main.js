@@ -95,9 +95,19 @@ function renderKindFilter(resp) {
   }
 }
 
+// Directory | Package toggle and externals checkbox. Group ids differ per grouping, so a switch collapses all.
+$("ov-groupby").addEventListener("change", (e) => setState({ groupBy: e.target.value, expanded: [] }));
+$("ov-externals").addEventListener("change", (e) => setState({ externals: e.target.checked, expanded: [] }));
+
+function syncOverviewControls() {
+  $("ov-groupby").value = state.groupBy;
+  $("ov-externals").checked = state.externals;
+}
+
 async function renderOverview(seq) {
+  syncOverviewControls();
   try {
-    const resp = await fetchOverview({ groupBy: state.groupBy, expanded: state.expanded, kinds: state.okinds });
+    const resp = await fetchOverview({ groupBy: state.groupBy, expanded: state.expanded, kinds: state.okinds, externals: state.externals });
     if (seq !== requestSeq) return;
     $("status").textContent = overviewStatus(resp);
     renderKindFilter(resp);

@@ -24,7 +24,7 @@ def register(app: FastAPI, get_graph: Callable, rel: Callable[[str | None], str 
         group_by: str = "directory",
         expanded: list[str] = Query(default=[], description="ids of expanded Groups"),
         kinds: str | None = Query(None, description="comma-separated edge kinds; default: all but calls"),
-        externals: bool = True,
+        externals: bool = Query(False, description="show external placeholders as one `external` Group"),
         g: Graph = Depends(get_graph),
     ) -> dict:
         available = [k for k in g.edge_kinds() if k != "contains"]
