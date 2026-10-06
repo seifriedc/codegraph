@@ -99,7 +99,7 @@ test("the client enforces the node budget on expansion and keeps a stub for what
   assert.deepEqual(m.view().stubs.map((s) => [s.hidden, s.offset]), [[5, 2]]);
 });
 
-test("warning at the threshold and prune back to the focus neighbourhood", () => {
+test("warning at the threshold and prune back to the focus neighborhood", () => {
   const m = createModel({ ...BUDGET, warnAt: 4 });
   m.reset(base());
   assert.equal(m.overWarning(), false);

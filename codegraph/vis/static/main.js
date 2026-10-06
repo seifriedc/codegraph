@@ -45,7 +45,7 @@ const url = createUrlController({
   notice: (text) => { $("trunc").textContent = text; $("trunc").hidden = !text; },
 });
 const setState = (patch) => url.apply(patch);
-const model = createModel(); // focus neighbourhood + accumulated expansions (scale policy)
+const model = createModel(); // focus neighborhood + accumulated expansions (scale policy)
 let layeredView = false; // hierarchy views have no expansion
 let baseHood = null; // the last focus-view response (truncated/total for the status line)
 const expanding = new Set();
@@ -170,7 +170,7 @@ function updateScaleUi() {
   if (!$("warn").hidden) $("warn-text").textContent = `${model.size} nodes on screen: the graph is getting crowded.`;
 }
 
-/** Click on a Stub node: page in its hidden neighbours, merge, highlight what is new. */
+/** Click on a Stub node: page in its hidden neighbors, merge, highlight what is new. */
 async function expandStub(stub) {
   if (layeredView || expanding.has(stub.id)) return;
   expanding.add(stub.id);

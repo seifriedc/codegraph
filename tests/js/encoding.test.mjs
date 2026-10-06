@@ -60,7 +60,7 @@ test("labels are constant on-screen size: font scales inversely with zoom", () =
   assert.ok(Math.abs(a.fontSize * 0.5 - b.fontSize * 2) < 1e-9);
 });
 
-test("below the zoom threshold only the focus and hovered neighbours are labelled", () => {
+test("below the zoom threshold only the focus and hovered neighbors are labelled", () => {
   const z = style.LABEL_ZOOM_THRESHOLD - 0.05;
   assert.equal(style.labelText("area", { zoom: z }), "");
   assert.equal(style.labelText("area", { zoom: z, isFocus: true }), "area");

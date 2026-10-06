@@ -2,7 +2,7 @@
   "components": {
     "schemas": {
       "ExpandResponse": {
-        "description": "One page of a Stub node's hidden neighbours; `stub` is the continuation, null on the last page.",
+        "description": "One page of a Stub node's hidden neighbors; `stub` is the continuation, null on the last page.",
         "properties": {
           "edges": {
             "items": {
@@ -191,14 +191,14 @@
             "title": "Name",
             "type": "string"
           },
-          "neighbour_counts": {
+          "neighbor_counts": {
             "additionalProperties": {
               "additionalProperties": {
                 "type": "integer"
               },
               "type": "object"
             },
-            "title": "Neighbour Counts",
+            "title": "Neighbor Counts",
             "type": "object"
           },
           "path": {
@@ -235,7 +235,7 @@
           "language",
           "external",
           "defining_files",
-          "neighbour_counts"
+          "neighbor_counts"
         ],
         "title": "NodeDetail",
         "type": "object"
@@ -817,7 +817,7 @@
         "type": "object"
       },
       "VisStub": {
-        "description": "Stub node: stands for `hidden` neighbours of `owner` (one edge kind and direction).\n\n`offset` is how many of that group are already shown; pass it to /api/expand to page in more.",
+        "description": "Stub node: stands for `hidden` neighbors of `owner` (one edge kind and direction).\n\n`offset` is how many of that group are already shown; pass it to /api/expand to page in more.",
         "properties": {
           "direction": {
             "title": "Direction",

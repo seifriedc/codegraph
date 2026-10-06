@@ -178,9 +178,9 @@ class Graph:
     def _ranked_groups(
         self, owners: list[str], steps: list[tuple[str, str, str]], kind_sql: str, kind_params: list
     ) -> dict[tuple[str, str, str], list[str]]:
-        """Distinct neighbours of each owner per (owner, direction, edge kind), sorted by qualified name.
+        """Distinct neighbors of each owner per (owner, direction, edge kind), sorted by qualified name.
 
-        `steps` is a list of (direction, owner column, neighbour column). Self-loops are ignored.
+        `steps` is a list of (direction, owner column, neighbor column). Self-loops are ignored.
         """
         groups: dict[tuple[str, str, str], set[tuple[str, str]]] = {}
         for direction, own_col, nb_col in steps:
@@ -213,11 +213,11 @@ class Graph:
         direction: 'out' (source to target), 'in' (reverse) or 'both'. Each returned
         node is a node dict with an added `depth` (0 for the focus). `limit` caps the
         node count: the deepest BFS ring is dropped first (a ring that only partly fits
-        keeps its first nodes by qualified name). `per_node_cap` caps the neighbours
+        keeps its first nodes by qualified name). `per_node_cap` caps the neighbors
         followed per node, edge kind and direction (first by qualified name); each
         overflowing group yields a Stub node record
         {"id", "owner", "direction", "kind", "hidden", "offset"} where `offset` is the
-        number of neighbours already shown (page the rest in with `neighbors_page`).
+        number of neighbors already shown (page the rest in with `neighbors_page`).
         Returns {"nodes", "edges", "stubs", "truncated", "total"} where total is the
         untruncated node count, or None if the focus node does not exist.
         """
@@ -272,12 +272,12 @@ class Graph:
     def neighbors_page(
         self, node_id: str, direction: str, kind: str, offset: int = 0, limit: int = 15
     ) -> dict | None:
-        """One page of a node's neighbours for a single edge kind and direction ('in' or 'out').
+        """One page of a node's neighbors for a single edge kind and direction ('in' or 'out').
 
-        Neighbours are ordered as in `neighborhood` (by qualified name), so a Stub node's
+        Neighbors are ordered as in `neighborhood` (by qualified name), so a Stub node's
         `offset` continues exactly where the capped view stopped. Returns
         {"nodes", "edges", "total", "hidden"}: nodes carry depth 1, edges are those between
-        the owner and the page, `total` counts all neighbours in the group and `hidden`
+        the owner and the page, `total` counts all neighbors in the group and `hidden`
         those still unseen after this page. None if the node does not exist.
         """
         if self.node_by_id(node_id) is None:
@@ -416,8 +416,8 @@ class Graph:
             "truncated": truncated, "total": total, "ring_counts": ring_counts,
         }
 
-    def neighbour_counts(self, node_id: str) -> dict[str, dict[str, int]]:
-        """Distinct neighbour nodes per edge kind, split by direction: {"in": {...}, "out": {...}}."""
+    def neighbor_counts(self, node_id: str) -> dict[str, dict[str, int]]:
+        """Distinct neighbor nodes per edge kind, split by direction: {"in": {...}, "out": {...}}."""
         out: dict[str, dict[str, int]] = {"in": {}, "out": {}}
         for direction, col, other in (("out", "source_id", "target_id"), ("in", "target_id", "source_id")):
             for kind, count in self.conn.execute(

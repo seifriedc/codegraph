@@ -38,7 +38,7 @@ def test_per_node_cap_is_a_parameter_bounded_by_the_server(client):
     assert client.get(f"/api/neighborhood/{HUB}", params={"per_node_cap": 101}).status_code == 422
 
 
-def test_expand_pages_in_the_next_neighbours_and_a_continuation_stub(client):
+def test_expand_pages_in_the_next_neighbors_and_a_continuation_stub(client):
     r = client.get(f"/api/expand/{HUB}", params={"direction": "in", "kind": "calls", "offset": 15, "limit": 10})
     body = r.json()
     assert [n["name"] for n in body["nodes"]] == [f"caller{i:02d}" for i in range(15, 25)]

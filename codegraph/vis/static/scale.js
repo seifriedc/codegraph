@@ -1,5 +1,5 @@
 // Scale policy, client side. Pure (no DOM, no Cytoscape): the node budget, the accumulated graph
-// (focus neighbourhood + expansions, with per-expansion undo and prune) and Stub node elements.
+// (focus neighborhood + expansions, with per-expansion undo and prune) and Stub node elements.
 // The server enforces the same numbers (codegraph/vis/focus.py); the client re-checks them.
 
 export const BUDGET = Object.freeze({ defaultLimit: 150, maxLimit: 500, warnAt: 300, fanOut: 15 });
@@ -129,7 +129,7 @@ export function createModel(budget = BUDGET) {
       return { dropped: resp.nodes.length - keep.length };
     },
 
-    /** Back to the focus neighbourhood the view started with; expansions are forgotten. */
+    /** Back to the focus neighborhood the view started with; expansions are forgotten. */
     prune() { if (baseResp) load(structuredClone(baseResp)); },
   };
 }

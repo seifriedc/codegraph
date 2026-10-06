@@ -34,7 +34,7 @@ def names(r):
     return {n["name"] for n in r["nodes"]}
 
 
-def test_per_node_cap_keeps_first_neighbours_by_name_and_emits_a_stub_for_the_rest(hub):
+def test_per_node_cap_keeps_first_neighbors_by_name_and_emits_a_stub_for_the_rest(hub):
     r = hub.neighborhood(hub.ids["hub"], direction="in", depth=1, edge_kinds=["calls"], per_node_cap=4)
     assert names(r) == {"hub", "c00", "c01", "c02", "c03"}
     assert r["stubs"] == [{

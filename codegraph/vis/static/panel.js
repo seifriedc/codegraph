@@ -1,7 +1,7 @@
-// Side panel: node details and per-kind neighbour counts. Module has no top-level DOM access.
+// Side panel: node details and per-kind neighbor counts. Module has no top-level DOM access.
 
 /** {"in": {calls: 2}, "out": {...}} -> [{kind, in, out}] sorted by kind, zero-filled. */
-export function neighbourRows(counts) {
+export function neighborRows(counts) {
   const kinds = new Set([...Object.keys(counts.in || {}), ...Object.keys(counts.out || {})]);
   return [...kinds].sort().map((kind) => ({ kind, in: (counts.in || {})[kind] || 0, out: (counts.out || {})[kind] || 0 }));
 }
@@ -34,8 +34,8 @@ export function renderPanel(root, detail, doc = root.ownerDocument) {
   if (!detail.defining_files.length) files.append(el(doc, "li", "-", "muted"));
   root.append(files);
 
-  root.append(el(doc, "h3", "Neighbours"));
-  const rows = neighbourRows(detail.neighbour_counts);
+  root.append(el(doc, "h3", "Neighbors"));
+  const rows = neighborRows(detail.neighbor_counts);
   if (!rows.length) { root.append(el(doc, "p", "none", "muted")); return; }
   const table = el(doc, "table", null, "counts");
   const head = el(doc, "tr");

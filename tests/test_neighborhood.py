@@ -33,7 +33,7 @@ def test_depth_annotates_each_node_with_distance_from_focus(chain):
     assert r["total"] == 5
 
 
-def test_depth_one_stops_at_direct_neighbours(chain):
+def test_depth_one_stops_at_direct_neighbors(chain):
     r = chain.neighborhood(chain.ids["a"], direction="out", depth=1)
     assert names(r) == {"a": 0, "b": 1, "c": 1, "x": 1}
 
@@ -55,7 +55,7 @@ def test_edge_kind_filter_restricts_traversal_and_returned_edges(chain):
 
 
 def test_edges_include_every_edge_among_included_nodes(chain):
-    # depth 1 from b (both): a and c are included; the a->c shortcut joins two neighbours and must be returned.
+    # depth 1 from b (both): a and c are included; the a->c shortcut joins two neighbors and must be returned.
     r = chain.neighborhood(chain.ids["b"], direction="both", depth=1)
     pairs = {(e["source_id"], e["target_id"]) for e in r["edges"]}
     i = chain.ids
@@ -85,8 +85,8 @@ def test_unknown_focus_returns_none(chain):
     assert chain.neighborhood("nope") is None
 
 
-def test_neighbour_counts_are_distinct_neighbours_per_kind_and_direction(chain):
-    counts = chain.neighbour_counts(chain.ids["a"])
+def test_neighbor_counts_are_distinct_neighbors_per_kind_and_direction(chain):
+    counts = chain.neighbor_counts(chain.ids["a"])
     assert counts == {"in": {"calls": 1}, "out": {"calls": 2, "inherits": 1}}
 
 

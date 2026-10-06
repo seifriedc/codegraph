@@ -106,12 +106,12 @@ def test_external_placeholders_are_flagged(client):
     assert not any(n["external"] for n in body["nodes"] if n["kind"] == "file")
 
 
-def test_node_detail_has_path_defining_files_and_neighbour_counts(client):
+def test_node_detail_has_path_defining_files_and_neighbor_counts(client):
     body = client.get(f"/api/node/{SHAPE}").json()
     assert body["qualified_name"] == "Shape" and body["kind"] == "class"
     assert body["path"] == "cpp/shapes.cpp"
     assert body["defining_files"] == ["cpp/shapes.cpp"]
-    assert body["neighbour_counts"] == {"in": {"contains": 1, "inherits": 2}, "out": {"contains": 2}}
+    assert body["neighbor_counts"] == {"in": {"contains": 1, "inherits": 2}, "out": {"contains": 2}}
 
 
 def test_node_detail_lists_every_defining_file(client):
@@ -137,8 +137,8 @@ def test_every_script_and_module_the_page_references_is_served(client):
     assert {"api.js", "state.js", "canvas.js", "layout.js", "elements.js", "panel.js", "style.js", "scale.js", "scale-style.js"} <= seen
 
 
-def test_neighbour_counts_match_the_neighborhood_edges(client):
+def test_neighbor_counts_match_the_neighborhood_edges(client):
     node = client.get(f"/api/node/{SHAPE}").json()
     hood = client.get(f"/api/neighborhood/{SHAPE}").json()
     inherits_in = {e["source_id"] for e in hood["edges"] if e["kind"] == "inherits" and e["target_id"] == SHAPE}
-    assert len(inherits_in) == node["neighbour_counts"]["in"]["inherits"]
+    assert len(inherits_in) == node["neighbor_counts"]["in"]["inherits"]

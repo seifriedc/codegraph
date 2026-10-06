@@ -1,4 +1,4 @@
-"""Stub node expansion endpoint: /api/expand/{id} pages in a node's hidden neighbours."""
+"""Stub node expansion endpoint: /api/expand/{id} pages in a node's hidden neighbors."""
 from __future__ import annotations
 
 from typing import Callable, Literal

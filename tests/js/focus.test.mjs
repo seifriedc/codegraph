@@ -12,7 +12,7 @@ const load = (f) => import(path.join(staticDir, f));
 
 const { parseHash, formatHash, DEFAULTS } = await load("state.js");
 const { shortLabel, toElements, statusText } = await load("elements.js");
-const { neighbourRows } = await load("panel.js");
+const { neighborRows } = await load("panel.js");
 const { createForceLayout, SETTLE } = await load("layout.js");
 const { fetchNeighborhood } = await load("api.js");
 
@@ -58,8 +58,8 @@ test("statusText reports truncation", () => {
   assert.equal(statusText({ nodes: [1], total: 1, truncated: false }), "Showing 1 node");
 });
 
-test("neighbourRows zero-fills and sorts", () => {
-  assert.deepEqual(neighbourRows({ in: { inherits: 2 }, out: { contains: 2 } }),
+test("neighborRows zero-fills and sorts", () => {
+  assert.deepEqual(neighborRows({ in: { inherits: 2 }, out: { contains: 2 } }),
     [{ kind: "contains", in: 0, out: 2 }, { kind: "inherits", in: 2, out: 0 }]);
 });
 

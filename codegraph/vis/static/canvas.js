@@ -41,7 +41,7 @@ export function createCanvas(container, { cytoscape, d3, dagre, onTapNode = () =
     requestAnimationFrame(() => { zoomPending = false; cy.nodes().updateStyle(); });
   });
 
-  // Hover emphasises a node and its neighbours (their labels show even when zoomed out).
+  // Hover emphasises a node and its neighbors (their labels show even when zoomed out).
   cy.on("mouseover", "node", (evt) => evt.target.closedNeighborhood().addClass("emphasised"));
   cy.on("mouseout", "node", () => cy.elements().removeClass("emphasised"));
 

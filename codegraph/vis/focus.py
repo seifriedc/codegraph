@@ -69,5 +69,5 @@ def register(app: FastAPI, get_graph: Callable, rel: Callable[[str | None], str 
         return {
             **shape_node(n, rel).model_dump(),
             "defining_files": [rel(p) for p in g.defining_files(n["id"])],
-            "neighbour_counts": g.neighbour_counts(n["id"]),
+            "neighbor_counts": g.neighbor_counts(n["id"]),
         }

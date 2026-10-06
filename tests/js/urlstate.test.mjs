@@ -45,7 +45,7 @@ test("refetch only when the graph itself changes", () => {
   assert.equal(plan({ filters: { hiddenNodeKinds: ["file"], hiddenEdgeKinds: [] } }).refetch, false);
 });
 
-test("a change that reloads the neighbourhood forgets stub expansions", () => {
+test("a change that reloads the neighborhood forgets stub expansions", () => {
   const from = { ...base, stubs: ["s1"] };
   for (const patch of [{ focus: "B" }, { depth: 3 }, { mode: "impact" }, { limit: 300 }, { view: "type" }, { direction: "in" }]) {
     assert.deepEqual(plan(patch, from).state.stubs, [], JSON.stringify(patch));

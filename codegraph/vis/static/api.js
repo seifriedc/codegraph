@@ -46,7 +46,7 @@ export function fetchNode(id, fetchImpl = fetch) {
   return getJson(`/api/node/${encodeURIComponent(id)}`, fetchImpl);
 }
 
-/** GET /api/expand/{owner}: the next page of a Stub node's hidden neighbours, or null if the owner is unknown. */
+/** GET /api/expand/{owner}: the next page of a Stub node's hidden neighbors, or null if the owner is unknown. */
 export function fetchExpand(stub, fetchImpl = fetch, pageSize = 15) {
   const p = new URLSearchParams({ direction: stub.direction, kind: stub.kind, offset: stub.offset, limit: pageSize });
   return getJson(`/api/expand/${encodeURIComponent(stub.owner)}?${p}`, fetchImpl);
