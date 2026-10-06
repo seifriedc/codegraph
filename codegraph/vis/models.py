@@ -54,6 +54,8 @@ class NeighborhoodResponse(BaseModel):
     stubs: list[VisStub] = []
     truncated: bool
     total: int
+    # Untruncated node count per BFS ring ({"1": n, ...}); only set in impact/dependencies mode.
+    ring_counts: dict[int, int] | None = None
 
 
 class NodeDetail(VisNode):
@@ -68,4 +70,15 @@ class ExpandResponse(BaseModel):
     nodes: list[VisNode]  # depth is 1 relative to the owner
     edges: list[VisEdge]  # edges between the owner and the page
     stub: VisStub | None
+    total: int
+
+
+class SearchHit(VisNode):
+    more_paths: int  # further files that also define this node (the "+N more" in result rows)
+
+
+class SearchResponse(BaseModel):
+    """Shared response shape: nodes, truncated, total."""
+    nodes: list[SearchHit]
+    truncated: bool
     total: int

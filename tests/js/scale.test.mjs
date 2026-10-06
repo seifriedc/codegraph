@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const staticDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "codegraph", "vis", "static");
 const { BUDGET, clampLimit, nextLimit, createModel, stubLabel, stubElements, scaleStatus } =
   await import(path.join(staticDir, "scale.js"));
-const { parseHash, formatHash } = await import(path.join(staticDir, "state.js"));
+const { parseHash, formatHash, DEFAULTS } = await import(path.join(staticDir, "state.js"));
 const { fetchNeighborhood, fetchExpand } = await import(path.join(staticDir, "api.js"));
 
 const node = (id, depth = 1) => ({ id, kind: "function", name: id, qualified_name: id, depth, external: false, language: "cpp" });
@@ -37,8 +37,8 @@ test("limit round-trips through the URL hash and is clamped", () => {
   assert.equal(parseHash("#focus=x&limit=300").limit, 300);
   assert.equal(parseHash("#focus=x").limit, 150);
   assert.equal(parseHash("#focus=x&limit=100000").limit, 500);
-  assert.equal(formatHash({ focus: "x", depth: 2, direction: "both", limit: 150 }), "#focus=x");
-  assert.equal(formatHash({ focus: "x", depth: 2, direction: "both", limit: 300 }), "#focus=x&limit=300");
+  assert.equal(formatHash({ focus: "x", ...DEFAULTS }), "#focus=x");
+  assert.equal(formatHash({ focus: "x", ...DEFAULTS, limit: 300 }), "#focus=x&limit=300");
 });
 
 test("api: limit and per_node_cap are sent, and fetchExpand builds its query", async () => {
@@ -128,4 +128,23 @@ test("status line reports totals, truncation, stubs and the 300-node warning", (
   assert.equal(scaleStatus({ shown: 3, total: 3, truncated: false }), "Showing 3 nodes");
   assert.match(scaleStatus({ shown: 150, total: 1204, truncated: true }), /150 of 1,204.*outer ring/);
   assert.match(scaleStatus({ shown: 320, total: 320, truncated: false, expanded: true }), /320 nodes \(expanded\)/);
+});
+
+test("adopt replaces the accumulated graph with a merged one, trimming to the budget and dropping orphan stubs", () => {
+  const m = createModel({ ...BUDGET, maxLimit: 4 });
+  m.reset(base());
+  m.expand("stub:f:in:calls", page(["c"], null));
+  const merged = {
+    focus: "f", nodes: [node("f", 0), node("a"), node("b"), node("c"), node("z")],
+    edges: [{ id: "e1", kind: "calls", source_id: "a", target_id: "f" }, { id: "ez", kind: "calls", source_id: "z", target_id: "f" }],
+    stubs: [stub("z", 2, 1), stub("f", 1, 1)],
+  };
+  const r = m.adopt(merged);
+  assert.equal(m.size, 4);
+  assert.deepEqual(r.dropped, 1);
+  assert.deepEqual(m.view().edges.map((e) => e.id), ["e1"]);
+  assert.deepEqual(m.view().stubs.map((s) => s.owner), ["f"]);
+  assert.equal(m.canUndo(), false);
+  m.prune();
+  assert.equal(m.size, 4, "the adopted graph is the new base");
 });

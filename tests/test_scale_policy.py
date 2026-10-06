@@ -90,3 +90,12 @@ def test_neighbors_page_outbound_and_unknown_node(hub):
     p = hub.neighbors_page(hub.ids["hub"], "out", "calls", offset=1, limit=5)
     assert [n["name"] for n in p["nodes"]] == ["t01", "t02"]
     assert hub.neighbors_page("nope", "out", "calls") is None
+
+
+def test_reach_modes_apply_the_cap_too(hub):
+    r = hub.reach(hub.ids["hub"], mode="impact", depth=1, per_node_cap=4)
+    assert names(r) == {"hub", "c00", "c01", "c02", "c03", "t00"}  # t00 inherits hub: its own group
+    assert [(s["direction"], s["kind"], s["hidden"]) for s in r["stubs"]] == [("in", "calls", 6)]
+    both = hub.reach(hub.ids["hub"], mode="both", depth=1, per_node_cap=2)
+    assert {(s["direction"], s["hidden"]) for s in both["stubs"]} == {("in", 8), ("out", 1)}
+    assert hub.reach(hub.ids["hub"], mode="both", depth=1)["stubs"] == []

@@ -2,11 +2,12 @@
 // owns the live layout. `cytoscape` and `d3` are injected (vendored UMD globals; see index.html).
 import { toElements } from "./elements.js";
 import { createForceLayout } from "./layout.js";
+import { layeredPositions } from "./hierarchy_layout.js";
 import { stylesheet } from "./style.js";
 import { FRESH_CLASS, scaleStylesheet } from "./scale-style.js";
 import { stubElements } from "./scale.js";
 
-export function createCanvas(container, { cytoscape, d3, onTapNode = () => {}, onTapStub = () => {}, onLayoutState = () => {}, cyOptions = {} }) {
+export function createCanvas(container, { cytoscape, d3, dagre, onTapNode = () => {}, onTapStub = () => {}, onLayoutState = () => {}, cyOptions = {} }) {
   const cy = cytoscape({
     container, style: [...stylesheet, ...scaleStylesheet], wheelSensitivity: 0.3, minZoom: 0.1, maxZoom: 3, ...cyOptions,
   });
@@ -91,7 +92,22 @@ export function createCanvas(container, { cytoscape, d3, onTapNode = () => {}, o
     layout.start(resp.focus);
   }
 
+  /** Replace the displayed graph with a hierarchy response, laid out top to bottom with dagre. */
+  function showHierarchy(resp, mode) {
+    layout.stop();
+    const { nodes, edges } = toElements(resp);
+    const sized = nodes.map((n) => ({ id: n.data.id, w: Math.max(60, n.data.label.length * 7 + 20), h: 34 }));
+    const positions = layeredPositions(dagre, sized, edges.map((e) => ({ source: e.data.source, target: e.data.target })), mode);
+    cy.batch(() => {
+      cy.elements().remove();
+      cy.add([...nodes.map((n) => ({ ...n, position: positions[n.data.id] })), ...edges]);
+    });
+    autoFit = true;
+    recenter(false);
+    onLayoutState("sleeping");
+  }
+
   function destroy() { layout.stop(); cy.destroy(); }
 
-  return { cy, show, highlight, recenter, destroy, layout };
+  return { cy, show, showHierarchy, highlight, recenter, destroy, layout };
 }

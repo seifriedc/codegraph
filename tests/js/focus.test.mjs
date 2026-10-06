@@ -17,7 +17,7 @@ const { createForceLayout, SETTLE } = await load("layout.js");
 const { fetchNeighborhood } = await load("api.js");
 
 test("state round-trips and omits defaults", () => {
-  const s = { focus: "Shape", depth: 3, direction: "in", limit: 300 };
+  const s = { focus: "Shape", depth: 3, direction: "in", mode: "both", view: DEFAULTS.view, limit: 300 };
   assert.deepEqual(parseHash(formatHash(s)), s);
   assert.equal(formatHash({ focus: "x", ...DEFAULTS }), "#focus=x");
   assert.equal(formatHash({ focus: null, ...DEFAULTS }), "");

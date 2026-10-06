@@ -3,21 +3,28 @@
 
 import { BUDGET, clampLimit } from "./scale.js";
 
-export const DEFAULTS = Object.freeze({ depth: 2, direction: "both", limit: BUDGET.defaultLimit });
+export const DEFAULTS = Object.freeze({ depth: 2, direction: "both", mode: "both", view: "focus", limit: BUDGET.defaultLimit });
 export const MAX_UI_DEPTH = 5;
+export const ALL_DEPTH = 10; // "all" in the UI: the server's maximum depth
 export const DIRECTIONS = ["both", "in", "out"];
+export const VIEWS = ["focus", "type", "declaration"]; // focus = neighborhood/reach; type|declaration = hierarchies
+export const MODES = ["both", "impact", "dependencies"]; // Impact set / Dependencies / union
 
-/** "#focus=Shape&depth=3" -> {focus, depth, direction}. Invalid values fall back to defaults. */
+/** "#focus=Shape&depth=3&mode=impact" -> {focus, depth, direction, mode}. Invalid values fall back to defaults. */
 export function parseHash(hash) {
   const p = new URLSearchParams((hash || "").replace(/^#/, ""));
-  const depth = Number.parseInt(p.get("depth"), 10);
+  const rawDepth = p.get("depth");
+  const depth = rawDepth === "all" ? ALL_DEPTH : Number.parseInt(rawDepth, 10);
   const direction = p.get("direction");
   const limit = p.has("limit") ? clampLimit(Number.parseInt(p.get("limit"), 10)) : DEFAULTS.limit;
+  const mode = p.get("mode");
   return {
     focus: p.get("focus") || null,
-    depth: depth >= 1 && depth <= MAX_UI_DEPTH ? depth : DEFAULTS.depth,
+    depth: (depth >= 1 && depth <= MAX_UI_DEPTH) || depth === ALL_DEPTH ? depth : DEFAULTS.depth,
     direction: DIRECTIONS.includes(direction) ? direction : DEFAULTS.direction,
     limit,
+    mode: MODES.includes(mode) ? mode : DEFAULTS.mode,
+    view: VIEWS.includes(p.get("view")) ? p.get("view") : DEFAULTS.view,
   };
 }
 
@@ -25,9 +32,11 @@ export function parseHash(hash) {
 export function formatHash(state) {
   const p = new URLSearchParams();
   if (state.focus) p.set("focus", state.focus);
-  if (state.depth !== DEFAULTS.depth) p.set("depth", String(state.depth));
+  if (state.depth !== DEFAULTS.depth) p.set("depth", state.depth === ALL_DEPTH ? "all" : String(state.depth));
   if (state.direction !== DEFAULTS.direction) p.set("direction", state.direction);
   if (state.limit != null && state.limit !== DEFAULTS.limit) p.set("limit", String(clampLimit(state.limit)));
+  if (state.mode !== DEFAULTS.mode) p.set("mode", state.mode);
+  if (state.view && state.view !== DEFAULTS.view) p.set("view", state.view);
   const s = p.toString();
   return s ? "#" + s : "";
 }

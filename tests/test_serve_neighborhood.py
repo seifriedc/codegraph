@@ -25,7 +25,7 @@ def test_neighborhood_returns_shared_graph_shape(client):
     r = client.get(f"/api/neighborhood/{SHAPE}")
     assert r.status_code == 200
     body = r.json()
-    assert set(body) == {"focus", "nodes", "edges", "stubs", "truncated", "total"}
+    assert set(body) == {"focus", "nodes", "edges", "stubs", "truncated", "total", "ring_counts"}
     assert body["focus"] == SHAPE
     assert body["truncated"] is False
     assert body["total"] == len(body["nodes"])

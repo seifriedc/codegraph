@@ -36,19 +36,25 @@ def register(app: FastAPI, get_graph: Callable, rel: Callable[[str | None], str 
         kinds: str | None = Query(None, description="comma-separated edge kinds"),
         limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
         per_node_cap: int = Query(DEFAULT_PER_NODE_CAP, ge=1, le=MAX_PER_NODE_CAP),
+        mode: Literal["impact", "dependencies", "both"] | None = Query(
+            None, description="Impact set / Dependencies / both; overrides direction and kinds"),
         g: Graph = Depends(get_graph),
     ) -> dict:
         focus = g.resolve_node(node_id)
         if focus is None:
             raise HTTPException(404, f"node not found: {node_id}")
-        edge_kinds = [k for k in kinds.split(",") if k] if kinds else None
-        r = g.neighborhood(focus["id"], direction=direction, depth=depth,
-                           edge_kinds=edge_kinds, limit=limit, per_node_cap=per_node_cap)
+        if mode:
+            r = g.reach(focus["id"], mode=mode, depth=depth, limit=limit, per_node_cap=per_node_cap)
+        else:
+            edge_kinds = [k for k in kinds.split(",") if k] if kinds else None
+            r = g.neighborhood(focus["id"], direction=direction, depth=depth,
+                               edge_kinds=edge_kinds, limit=limit, per_node_cap=per_node_cap)
         return {
             "focus": focus["id"],
+            "ring_counts": r.get("ring_counts"),
             "nodes": [shape_node(n, rel) for n in r["nodes"]],
             "edges": [VisEdge(**{k: e[k] for k in ("id", "kind", "source_id", "target_id")}) for e in r["edges"]],
-            "stubs": [VisStub(**st) for st in r["stubs"]],
+            "stubs": [VisStub(**st) for st in r.get("stubs", [])],
             "truncated": r["truncated"],
             "total": r["total"],
         }

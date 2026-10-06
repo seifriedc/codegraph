@@ -111,6 +111,24 @@ export function createModel(budget = BUDGET) {
       return true;
     },
 
+    /**
+     * Replace everything with `resp` (e.g. a Shift-Enter search merge), trimmed client-side to the
+     * node budget: nodes beyond maxLimit (later ones first) and their edges and stubs are dropped.
+     * It becomes the new base; undo history is cleared. Returns {dropped}.
+     */
+    adopt(resp) {
+      const keep = resp.nodes.slice(0, budget.maxLimit);
+      const ids = new Set(keep.map((n) => n.id));
+      baseResp = {
+        focus: resp.focus, nodes: keep,
+        edges: resp.edges.filter((e) => ids.has(e.source_id) && ids.has(e.target_id)),
+        stubs: (resp.stubs || []).filter((s) => ids.has(s.owner)),
+      };
+      baseResp = structuredClone(baseResp);
+      load(structuredClone(baseResp));
+      return { dropped: resp.nodes.length - keep.length };
+    },
+
     /** Back to the focus neighbourhood the view started with; expansions are forgotten. */
     prune() { if (baseResp) load(structuredClone(baseResp)); },
   };
