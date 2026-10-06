@@ -25,7 +25,8 @@ test("state round-trips and omits defaults", () => {
 
 test("state round-trips every hash key together", () => {
   const s = { focus: "Shape", depth: 4, direction: "out", mode: "impact", view: "type", limit: 400,
-    expanded: ["g1", "g2"], okinds: ["imports", "calls"], groupBy: "package", externals: true };
+    expanded: ["g1", "g2"], okinds: ["imports", "calls"], groupBy: "package", externals: true,
+    filters: { hiddenNodeKinds: ["file"], hiddenEdgeKinds: ["calls"] }, stubs: ["stub:a:out:calls"] };
   assert.deepEqual(parseHash(formatHash(s)), s);
 });
 
