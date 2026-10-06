@@ -1,6 +1,7 @@
 """`codegraph serve` command: help text, and a real server process answering HTTP."""
 
 from __future__ import annotations
+import re
 import socket
 import subprocess
 import sys
@@ -11,16 +12,19 @@ from typer.testing import CliRunner
 
 from codegraph.cli import app
 
+ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
+
 
 def test_serve_is_documented_in_cli_help():
-    # Plain help output: FORCE_COLOR in the caller's env would wrap options in ANSI codes.
-    runner = CliRunner(env={"NO_COLOR": "1", "FORCE_COLOR": None})
+    runner = CliRunner()
     top = runner.invoke(app, ["--help"])
     assert "serve" in top.output
     result = runner.invoke(app, ["serve", "--help"])
     assert result.exit_code == 0
+    # Typer forces ANSI styling under GITHUB_ACTIONS/FORCE_COLOR at import time.
+    output = ANSI_ESCAPE.sub("", result.output)
     for text in ("--db", "--port", "--host", "read-only"):
-        assert text in result.output
+        assert text in output
 
 
 def test_serve_exits_with_error_for_missing_db(tmp_path):
