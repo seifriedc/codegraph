@@ -152,6 +152,95 @@ class Graph:
         """Full transitive closure along a single edge kind."""
         return self.traverse(node_id, edge_kinds=[edge_kind], direction=direction, max_depth=999)
 
+    # ── Neighborhood ──────────────────────────────────────────────────────────
+
+    def neighborhood(
+        self,
+        node_id: str,
+        direction: str = "both",
+        depth: int = 1,
+        edge_kinds: list[str] | None = None,
+        limit: int | None = None,
+    ) -> dict | None:
+        """Nodes within `depth` of a Focus node, plus every edge among the included nodes.
+
+        direction: 'out' (source to target), 'in' (reverse) or 'both'. Each returned
+        node is a node dict with an added `depth` (0 for the focus). `limit` caps the
+        node count: the deepest BFS ring is dropped first (a ring that only partly fits
+        keeps its first nodes by qualified name). Returns
+        {"nodes", "edges", "truncated", "total"} where total is the untruncated node
+        count, or None if the focus node does not exist.
+        """
+        focus = self.node_by_id(node_id)
+        if focus is None:
+            return None
+
+        kind_sql, kind_params = "", []
+        if edge_kinds:
+            kind_sql = f"AND e.kind IN ({', '.join('?' * len(edge_kinds))})"
+            kind_params = list(edge_kinds)
+
+        steps = {"out": [("source_id", "target_id")], "in": [("target_id", "source_id")],
+                 "both": [("source_id", "target_id"), ("target_id", "source_id")]}[direction]
+
+        depth_of: dict[str, int] = {node_id: 0}
+        frontier = [node_id]
+        for d in range(1, depth + 1):
+            if not frontier:
+                break
+            found: set[str] = set()
+            for src_col, dst_col in steps:
+                rows = self.conn.execute(
+                    f"SELECT DISTINCT e.{dst_col} FROM edges e "
+                    f"WHERE e.{src_col} IN (SELECT unnest(?)) {kind_sql}",
+                    [frontier, *kind_params],
+                ).fetchall()
+                found.update(r[0] for r in rows)
+            frontier = sorted(i for i in found if i not in depth_of)
+            for i in frontier:
+                depth_of[i] = d
+
+        rows = self._fetchall(
+            "SELECT * FROM nodes WHERE id IN (SELECT unnest(?))", [list(depth_of)]
+        )
+        for r in rows:
+            r["depth"] = depth_of[r["id"]]
+        rows.sort(key=lambda r: (r["depth"], r["qualified_name"] or r["name"], r["id"]))
+        total = len(rows)
+        truncated = limit is not None and total > limit
+        if truncated:
+            rows = rows[:limit]
+
+        ids = [r["id"] for r in rows]
+        edges = self._fetchall(
+            f"SELECT * FROM edges e WHERE e.source_id IN (SELECT unnest(?)) "
+            f"AND e.target_id IN (SELECT unnest(?)) {kind_sql} ORDER BY e.id",
+            [ids, ids, *kind_params],
+        )
+        return {"nodes": rows, "edges": edges, "truncated": truncated, "total": total}
+
+    def neighbour_counts(self, node_id: str) -> dict[str, dict[str, int]]:
+        """Distinct neighbour nodes per edge kind, split by direction: {"in": {...}, "out": {...}}."""
+        out: dict[str, dict[str, int]] = {"in": {}, "out": {}}
+        for direction, col, other in (("out", "source_id", "target_id"), ("in", "target_id", "source_id")):
+            for kind, count in self.conn.execute(
+                f"SELECT kind, COUNT(DISTINCT {other}) FROM edges WHERE {col} = ? "
+                f"GROUP BY kind ORDER BY kind",
+                [node_id],
+            ).fetchall():
+                out[direction][kind] = count
+        return out
+
+    def defining_files(self, node_id: str) -> list[str]:
+        """Paths of every file node that contains the given node, sorted."""
+        rows = self.conn.execute(
+            "SELECT DISTINCT f.file_path FROM edges e JOIN nodes f ON f.id = e.source_id "
+            "WHERE e.target_id = ? AND e.kind = 'contains' AND f.kind = 'file' "
+            "AND f.file_path IS NOT NULL ORDER BY f.file_path",
+            [node_id],
+        ).fetchall()
+        return [r[0] for r in rows]
+
     # ── High-level queries ────────────────────────────────────────────────────
 
     def declaration_hierarchy(self, node_id: str) -> list[dict]:

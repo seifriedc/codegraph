@@ -11,3 +11,38 @@ class StatsResponse(BaseModel):
     nodes_by_language: dict[str, int]
     nodes_by_kind: dict[str, int]
     edges_by_kind: dict[str, int]
+
+
+class VisNode(BaseModel):
+    id: str
+    kind: str
+    name: str
+    qualified_name: str | None
+    path: str | None  # relative to the common ancestor of indexed files
+    line_start: int | None
+    line_end: int | None
+    language: str | None
+    depth: int | None = None  # BFS distance from the Focus node (neighborhood responses)
+    external: bool  # External placeholder: referenced but not indexed
+
+
+class VisEdge(BaseModel):
+    id: str
+    kind: str
+    source_id: str
+    target_id: str
+
+
+class NeighborhoodResponse(BaseModel):
+    """Shared graph-response shape: nodes, edges, truncated, total (plus the focus id)."""
+    focus: str
+    nodes: list[VisNode]
+    edges: list[VisEdge]
+    truncated: bool
+    total: int
+
+
+class NodeDetail(VisNode):
+    defining_files: list[str]
+    # distinct neighbour nodes per edge kind: {"in": {kind: n}, "out": {kind: n}}
+    neighbour_counts: dict[str, dict[str, int]]
