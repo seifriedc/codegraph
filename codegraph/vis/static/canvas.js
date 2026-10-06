@@ -18,7 +18,7 @@ export function createCanvas(container, { cytoscape, d3, dagre, onTapNode = () =
   const layout = createForceLayout(cy, d3, {
     onWake: () => onLayoutState("running"),
     onSleep: () => {
-      if (autoFit) recenter(false);
+      if (autoFit) recenter(true); // glide, never snap: the user may already be looking at the view
       onLayoutState("sleeping");
     },
   });
@@ -62,6 +62,15 @@ export function createCanvas(container, { cytoscape, d3, dagre, onTapNode = () =
     const opts = { eles: cy.elements(), padding: 40 };
     if (animate) cy.animate({ fit: opts }, { duration: 250 });
     else cy.fit(opts.eles, opts.padding);
+  }
+
+  /** Smoothly pan so node `id` is centred, keeping the current zoom. */
+  function centerOn(id) {
+    const ele = cy.getElementById(id);
+    if (ele.empty()) return;
+    cy.resize();
+    cy.stop();
+    cy.animate({ center: { eles: ele } }, { duration: 400, easing: "ease-in-out-cubic" });
   }
 
   /** Reset the zoom to 100% about the centre of the viewport (pan position of that centre is kept). */
@@ -121,10 +130,17 @@ export function createCanvas(container, { cytoscape, d3, dagre, onTapNode = () =
     });
 
     setFilters(filters);
-    if (!expansion) autoFit = true;
     highlight(fresh);
-    if (!hadNodes) recenter(false);
     layout.start(resp.focus);
+    if (!hadNodes) {
+      autoFit = true; // first render: fit when the layout settles
+      recenter(false);
+    } else if (!expansion) {
+      // Refocus: the pinned Focus node does not move while the layout settles, so glide to it now
+      // and never re-fit afterwards (a late fit is the jarring snap).
+      autoFit = false;
+      centerOn(resp.focus);
+    }
   }
 
   /** Replace the displayed graph with a hierarchy response, laid out top to bottom with dagre. */
