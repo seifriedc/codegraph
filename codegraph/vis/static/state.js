@@ -7,11 +7,15 @@
 // default, which leaves `calls` off), `groupby` ("directory" | "package"), `externals` (`externals=1` shows the external Group; hidden by default).
 
 import { BUDGET, clampLimit } from "./scale.js";
+import { defaultFilters, filtersFromParams, filtersToParams } from "./filters.js";
 
 export const DEFAULTS = Object.freeze({
   depth: 2, direction: "both", mode: "both", view: "focus", limit: BUDGET.defaultLimit,
   expanded: Object.freeze([]), okinds: null, groupBy: "directory", externals: false,
+  filters: Object.freeze(defaultFilters()), stubs: Object.freeze([]),
 });
+// Focus-view keys beyond the above: `hideNodes`/`hideEdges` (comma lists of kinds hidden by the legend filters)
+// and `stubs` (repeated `stubs=<stub id>`, one per expanded page, replayed in order on load).
 export const MAX_UI_DEPTH = 5;
 export const ALL_DEPTH = 10; // "all" in the UI: the server's maximum depth
 export const DIRECTIONS = ["both", "in", "out"];
@@ -44,6 +48,8 @@ export function parseHash(hash) {
     okinds: p.has("okinds") ? p.get("okinds").split(",").filter(Boolean) : null,
     groupBy: GROUP_BYS.includes(groupBy) ? groupBy : DEFAULTS.groupBy,
     externals: p.get("externals") === "1",
+    filters: filtersFromParams({ hideNodes: p.get("hideNodes"), hideEdges: p.get("hideEdges") }),
+    stubs: p.getAll("stubs"),
   };
 }
 
@@ -60,6 +66,9 @@ export function formatHash(state) {
   if (state.okinds) p.set("okinds", state.okinds.join(","));
   if (state.groupBy && state.groupBy !== DEFAULTS.groupBy) p.set("groupby", state.groupBy);
   if (state.externals) p.set("externals", "1");
+  const fp = filtersToParams(state.filters || defaultFilters());
+  for (const k of ["hideNodes", "hideEdges"]) if (fp[k]) p.set(k, fp[k]);
+  for (const id of state.stubs || []) p.append("stubs", id);
   const s = p.toString();
   return s ? "#" + s : "";
 }

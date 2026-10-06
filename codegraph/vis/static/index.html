@@ -46,6 +46,7 @@
     #ov-kinds label { margin-right: 8px; }
     #tip { position: absolute; z-index: 10; pointer-events: none; white-space: pre; padding: 4px 8px;
            background: #222; color: #fff; border-radius: 4px; font-size: 12px; }
+    #trunc { background: #fef3c7; border: 1px solid #f59e0b; padding: 2px 8px; border-radius: 4px; }
     #warn { background: #fef3c7; border: 1px solid #f59e0b; padding: 2px 8px; border-radius: 4px; }
     .search { position: relative; }
     .s-input { width: 280px; padding: 4px 8px; }
@@ -97,6 +98,7 @@
     <button id="undo" type="button" disabled title="Undo the last expansion">Undo expand</button>
     <span id="layout-state"></span>
     <span id="status">Loading...</span>
+    <span id="trunc" hidden role="status"></span>
     <span id="warn" hidden><span id="warn-text"></span>
       <button id="prune" type="button" title="Drop all expansions, keep the focus neighbourhood">Prune to focus neighbourhood</button></span>
   </header>
