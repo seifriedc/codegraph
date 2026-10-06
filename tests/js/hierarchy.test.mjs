@@ -20,11 +20,12 @@ function loadDagre() {
   return ctx.dagre;
 }
 
-test("state carries the hierarchy mode and omits the default", () => {
-  assert.equal(parseHash("#focus=Shape&mode=type").mode, "type");
-  assert.equal(parseHash("#focus=Shape&mode=declaration").mode, "declaration");
-  assert.equal(parseHash("#focus=Shape&mode=bogus").mode, DEFAULTS.mode);
-  assert.equal(formatHash({ ...DEFAULTS, focus: "x", mode: "type" }), "#focus=x&mode=type");
+test("state carries the view key (separate from the reach mode) and omits the default", () => {
+  assert.equal(parseHash("#focus=Shape&view=type").view, "type");
+  assert.equal(parseHash("#focus=Shape&view=declaration").view, "declaration");
+  assert.equal(parseHash("#focus=Shape&view=bogus").view, DEFAULTS.view);
+  assert.equal(parseHash("#focus=Shape&mode=impact&view=type").mode, "impact");
+  assert.equal(formatHash({ ...DEFAULTS, focus: "x", view: "type" }), "#focus=x&view=type");
   assert.equal(formatHash({ ...DEFAULTS, focus: "x" }), "#focus=x");
 });
 
