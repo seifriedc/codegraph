@@ -33,7 +33,14 @@ class Edge:
     kind: str        # imports | calls | defines | contains | inherits | references | instantiates
     source_id: str
     target_id: str
-    id: str = field(default_factory=random_id)
+    id: str = ""     # empty -> derived deterministically in __post_init__
     file_path: str | None = None
     line: int | None = None
     col: int | None = None
+
+    def __post_init__(self) -> None:
+        if not self.id:
+            self.id = stable_id(
+                f"edge:{self.kind}:{self.source_id}:{self.target_id}:"
+                f"{self.file_path}:{self.line}:{self.col}"
+            )

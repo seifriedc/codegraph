@@ -80,7 +80,7 @@ class Indexer:
         line: int | None = None,
         col: int | None = None,
     ) -> str:
-        e = Edge(kind=kind, source_id=source_id, target_id=target_id,
+        e = Edge(kind=kind, source_id=source_id, target_id=target_id, id=random_id(),
                  file_path=file_path, line=line, col=col)
         insert_edges(self.conn, [e])
         return e.id

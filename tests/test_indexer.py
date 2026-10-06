@@ -19,11 +19,11 @@ def test_ada_creates_file_nodes(tmp_db):
     idx = Indexer(tmp_db)
     count = idx.index(FIXTURES / "ada")
     idx.close()
-    assert count == 3  # geometry.ads + geometry.adb + child_pkg.ads
+    assert count == 4  # + nested_pkg.ads
 
     g = Graph(tmp_db)
     file_nodes = g.nodes(kind="file", language="ada")
-    assert len(file_nodes) == 3
+    assert len(file_nodes) == 4
 
 
 def test_ada_extracts_package(tmp_db):
@@ -165,6 +165,44 @@ def test_ada_imports_edge(tmp_db):
     for n in ada_nodes:
         imports.extend(g.edges_from(n["id"], kinds=["imports"]))
     assert len(imports) >= 1
+
+
+def _package_contains_pairs(g):
+    pkgs = {p["id"]: p["qualified_name"] for p in g.nodes(kind="package", language="ada")}
+    pairs = set()
+    for pid, qname in pkgs.items():
+        for e in g.edges_from(pid, kinds=["contains"]):
+            if e["target_id"] in pkgs:
+                pairs.add((qname, pkgs[e["target_id"]]))
+    return pairs
+
+
+def test_ada_package_nesting_contains_edges(tmp_db):
+    idx = Indexer(tmp_db)
+    idx.index(FIXTURES / "ada")
+    idx.close()
+
+    pairs = _package_contains_pairs(Graph(tmp_db))
+    # Dotted child unit: parent package contains child package
+    assert ("Geometry", "Geometry.Utils") in pairs
+    # Physically nested package is qualified by its enclosing package
+    assert ("Outer", "Outer.Inner") in pairs
+
+
+def test_ada_reindex_gives_identical_node_and_edge_ids(tmp_path):
+    def snapshot(db):
+        idx = Indexer(db)
+        idx.index(FIXTURES / "ada")
+        idx.close()
+        g = Graph(db)
+        nodes = {n["id"] for n in g.nodes(language="ada")}
+        edges = {e["id"] for n in nodes for e in g.edges_from(n)}
+        return nodes, edges
+
+    first = snapshot(tmp_path / "a.duckdb")
+    second = snapshot(tmp_path / "b.duckdb")
+    assert first == second
+    assert first[1]
 
 
 # ── C ─────────────────────────────────────────────────────────────────────────
