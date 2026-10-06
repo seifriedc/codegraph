@@ -4,7 +4,8 @@ import { fetchNeighborhood, fetchNode } from "./api.js";
 import { createCanvas } from "./canvas.js";
 import { statusText } from "./elements.js";
 import { renderPanel } from "./panel.js";
-import { formatHash, parseHash, MAX_UI_DEPTH } from "./state.js";
+import { depthOptions, MODES, ringText } from "./reach.js";
+import { formatHash, parseHash } from "./state.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -33,7 +34,8 @@ function setState(patch, { push = false } = {}) {
 async function render() {
   const seq = ++requestSeq;
   $("depth").value = String(state.depth);
-  $("direction").value = state.direction;
+  $("mode").value = state.mode;
+  $("rings").textContent = "";
   if (!state.focus) {
     $("status").textContent = "No focus node. Open the page with #focus=<node id or qualified name>.";
     renderPanel($("panel"), null);
@@ -41,7 +43,7 @@ async function render() {
   }
   try {
     const [hood, detail] = await Promise.all([
-      fetchNeighborhood(state.focus, { depth: state.depth, direction: state.direction }),
+      fetchNeighborhood(state.focus, { depth: state.depth, mode: state.mode }),
       fetchNode(state.focus),
     ]);
     if (seq !== requestSeq) return;
@@ -51,6 +53,7 @@ async function render() {
       return;
     }
     $("status").textContent = statusText(hood);
+    $("rings").textContent = ringText(hood.ring_counts, state.depth);
     canvas.show(hood);
     renderPanel($("panel"), detail);
   } catch (err) {
@@ -58,9 +61,10 @@ async function render() {
   }
 }
 
-for (let d = 1; d <= MAX_UI_DEPTH; d++) $("depth").append(new Option(String(d), String(d)));
+for (const o of depthOptions()) $("depth").append(new Option(o.label, String(o.value)));
+for (const m of MODES) $("mode").append(new Option(m.label, m.value));
 $("depth").addEventListener("change", (e) => setState({ depth: Number(e.target.value) }));
-$("direction").addEventListener("change", (e) => setState({ direction: e.target.value }));
+$("mode").addEventListener("change", (e) => setState({ mode: e.target.value }));
 $("recenter").addEventListener("click", () => canvas.recenter());
 addEventListener("hashchange", () => { state = parseHash(location.hash); render(); });
 
