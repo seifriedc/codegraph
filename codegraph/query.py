@@ -279,6 +279,18 @@ class Graph:
             del r["tier"]
         return {"nodes": rows, "total": total, "truncated": total > len(rows)}
 
+    def edges_among(self, node_ids: list[str], edge_kinds: list[str] | None = None) -> list[dict]:
+        """Every edge whose source and target are both in `node_ids` (optionally of the given kinds)."""
+        kind_sql, kind_params = "", []
+        if edge_kinds:
+            kind_sql = f"AND e.kind IN ({', '.join('?' * len(edge_kinds))})"
+            kind_params = list(edge_kinds)
+        return self._fetchall(
+            f"SELECT * FROM edges e WHERE e.source_id IN (SELECT unnest(?)) "
+            f"AND e.target_id IN (SELECT unnest(?)) {kind_sql} ORDER BY e.id",
+            [node_ids, node_ids, *kind_params],
+        )
+
     # Edge kinds that carry impact. All point from dependant to dependency (a calls b, a
     # inherits b), so the Impact set follows them backwards (for inherits: descendants)
     # and Dependencies follow them forwards (for inherits: ancestors).

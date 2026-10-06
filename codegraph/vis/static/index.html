@@ -50,6 +50,13 @@
   <header>
     <h1>codegraph</h1>
     <div id="search" class="search"></div>
+    <label>View
+      <select id="view">
+        <option value="focus">focus</option>
+        <option value="type">type hierarchy</option>
+        <option value="declaration">declaration hierarchy</option>
+      </select>
+    </label>
     <label>Show <select id="mode"></select></label>
     <label>Depth <select id="depth"></select></label>
     <span id="rings" class="muted" title="Nodes per ring (distance from the focus)"></span>
@@ -66,6 +73,7 @@
   <script src="vendor/d3-quadtree.min.js"></script>
   <script src="vendor/d3-timer.min.js"></script>
   <script src="vendor/d3-force.min.js"></script>
+  <script src="vendor/dagre.min.js"></script>
   <script type="module" src="main.js"></script>
 </body>
 </html>
