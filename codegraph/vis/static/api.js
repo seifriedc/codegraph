@@ -22,3 +22,11 @@ export function fetchNeighborhood(focus, { depth, direction, kinds, limit } = {}
 export function fetchNode(id, fetchImpl = fetch) {
   return getJson(`/api/node/${encodeURIComponent(id)}`, fetchImpl);
 }
+
+/** GET /api/search. filters: {kinds: [], languages: []}. Returns {nodes, total, truncated}. */
+export function fetchSearch(q, { kinds, languages } = {}, fetchImpl = fetch) {
+  const p = new URLSearchParams({ q });
+  if (kinds && kinds.length) p.set("kinds", kinds.join(","));
+  if (languages && languages.length) p.set("languages", languages.join(","));
+  return getJson(`/api/search?${p}`, fetchImpl);
+}

@@ -29,11 +29,27 @@
     #panel td:nth-child(n+2), #panel th:nth-child(n+2) { text-align: right; }
     .muted { color: var(--muted); }
     button { cursor: pointer; }
+    .search { position: relative; }
+    .s-input { width: 280px; padding: 4px 8px; }
+    .s-chips { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
+    .s-chip { font-size: 11px; padding: 0 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-bg); }
+    .s-chip[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .s-drop { position: absolute; top: 100%; left: 0; z-index: 10; width: 420px; max-height: 60vh; overflow: auto;
+              background: var(--panel-bg); border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,.15); }
+    .s-row { padding: 4px 8px; cursor: pointer; border-bottom: 1px solid var(--border); }
+    .s-row.selected, .s-row:hover { background: #e8eefc; }
+    .s-top { display: flex; gap: 6px; align-items: baseline; }
+    .s-kind { font-size: 10px; text-transform: uppercase; color: var(--muted); min-width: 4.5em; }
+    .s-name { font-weight: 600; flex: 1; }
+    .s-lang { font-size: 10px; border: 1px solid var(--border); border-radius: 3px; padding: 0 4px; color: var(--muted); }
+    .s-qn, .s-path { color: var(--muted); font-size: 11px; word-break: break-all; }
+    .s-note, .s-head { padding: 4px 8px; color: var(--muted); font-size: 11px; }
   </style>
 </head>
 <body>
   <header>
     <h1>codegraph</h1>
+    <div id="search" class="search"></div>
     <label>Depth <select id="depth"></select></label>
     <label>Direction
       <select id="direction">

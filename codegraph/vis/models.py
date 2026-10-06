@@ -46,3 +46,14 @@ class NodeDetail(VisNode):
     defining_files: list[str]
     # distinct neighbour nodes per edge kind: {"in": {kind: n}, "out": {kind: n}}
     neighbour_counts: dict[str, dict[str, int]]
+
+
+class SearchHit(VisNode):
+    more_paths: int  # further files that also define this node (the "+N more" in result rows)
+
+
+class SearchResponse(BaseModel):
+    """Shared response shape: nodes, truncated, total."""
+    nodes: list[SearchHit]
+    truncated: bool
+    total: int
