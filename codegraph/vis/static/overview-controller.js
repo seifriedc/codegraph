@@ -2,13 +2,26 @@
 // render of one /api/overview response. DOM access goes through the injected `$` (id -> element).
 import { overviewStatus, toggleExpanded } from "./overview-elements.js";
 
-export function createOverviewController({ $, canvas, overview, url, setState, fetchOverview, renderPanel, isCurrent }) {
+export function createOverviewController({ $, canvas, overview, url, setState, fetchOverview, fetchNode, renderPanel, isCurrent }) {
   let selected = null; // {id, nodeId, name} of the selected overview node
 
   function select(data) {
     selected = data ? { id: data.id, nodeId: data.nodeId, name: data.full } : null;
     $("ov-selection").textContent = selected ? selected.name : "";
     $("ov-focus").disabled = !(selected && selected.nodeId);
+    showDetails(selected);
+  }
+
+  /** Fill the Details panel for the selection; Groups have no node, so they (and no selection) show the placeholder. */
+  async function showDetails(sel) {
+    renderPanel($("panel"), null);
+    if (!sel || !sel.nodeId) return;
+    try {
+      const detail = await fetchNode(sel.nodeId);
+      if (selected === sel && detail) renderPanel($("panel"), detail); // drop a response for an earlier click
+    } catch (err) {
+      if (selected === sel) $("status").textContent = `Error: ${err.message}`;
+    }
   }
 
   /** Click on an overview node: select it; a Group also expands (or collapses) in place. */
@@ -45,7 +58,6 @@ export function createOverviewController({ $, canvas, overview, url, setState, f
       if (!isCurrent(seq)) return;
       $("status").textContent = overviewStatus(resp);
       renderKindFilter(resp);
-      renderPanel($("panel"), null);
       overview.show(resp);
       if (selected && !canvas.cy.getElementById(selected.id).length) select(null);
       else if (selected) canvas.cy.getElementById(selected.id).select();

@@ -55,7 +55,7 @@ let requestSeq = 0; // ignore responses that arrive after a newer request
 // ---- Overview (landing view): see overview-controller.js ----
 let shownView = null;   // which view the canvas currently holds; elements are cleared on a switch
 const ovc = createOverviewController({
-  $, canvas, overview, url, setState, fetchOverview, renderPanel, isCurrent: (seq) => seq === requestSeq,
+  $, canvas, overview, url, setState, fetchOverview, fetchNode, renderPanel, isCurrent: (seq) => seq === requestSeq,
 });
 
 function enterView(view) {
