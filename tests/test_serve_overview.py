@@ -39,7 +39,7 @@ def test_calls_is_off_by_default_and_can_be_switched_on(client):
     assert "contains" not in body["available_kinds"]
     assert not any("calls" in e["kinds"] for e in body["edges"])
 
-    with_calls = client.get("/api/overview", params={"kinds": "calls"}).json()
+    with_calls = client.get("/api/overview", params={"kinds": "calls", "externals": "true"}).json()
     assert with_calls["kinds"] == ["calls"]
     assert all(set(e["kinds"]) == {"calls"} for e in with_calls["edges"])
     assert with_calls["edges"], "fixtures contain calls"
@@ -78,9 +78,9 @@ def test_expanded_ids_come_from_the_previous_response(client):
 
 
 def test_externals_flag(client):
-    with_ext = client.get("/api/overview").json()
+    with_ext = client.get("/api/overview", params={"externals": "true"}).json()
     assert any(n["kind"] == "external" for n in with_ext["nodes"])
-    without = client.get("/api/overview", params={"externals": "false"}).json()
+    without = client.get("/api/overview").json()
     assert not any(n["kind"] == "external" for n in without["nodes"])
 
 
