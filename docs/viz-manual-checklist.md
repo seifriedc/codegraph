@@ -74,11 +74,20 @@ for every failure.
 - [ ] Up/Down move the highlighted row (scrolling it into view); Enter replaces the Focus node; Escape clears and closes. Enter with an empty box does nothing.
 - [ ] Shift-Enter adds the result's neighborhood to the canvas without changing the Focus node (focus views only).
 
-### Recenter and fit-all
+### Show mode and Direction (focus views)
+
+- [ ] The default Show mode is "Neighborhood (all edges)" (URL has no `mode` key); the Direction select is enabled and set to "both".
+- [ ] Focus a file node: the Neighborhood shows its contained functions and classes (`contains` edges); a package focus shows its members. Neither is nearly empty.
+- [ ] Direction "out" shows only what the Focus node points to, "in" only what points to it; the choice is stored as `direction=` in the URL, survives reload, and Back/forward restores it (it replaces the history entry).
+- [ ] Switching Show to Impact set, Dependencies or Impact + dependencies disables the Direction select (those modes fix their own direction and edge kinds); switching back re-enables it with the previous value.
+- [ ] A hand-edited `kinds=inherits,contains` in the URL restricts the fetched edges to those kinds in Neighborhood mode (the legend filters remain client-side visibility only and never refetch).
+
+### Recenter, Reset zoom and fit-all
 
 - [ ] After panning and zooming far away, Recenter fits every node in view with comfortable margins.
 - [ ] After expanding a node that adds nodes off-screen, Recenter brings them in view.
 - [ ] Recenter does not move any node or restart the layout.
+- [ ] "Reset zoom" returns to 100% about the middle of the view, in the focus view, a hierarchy view and the Overview; it does not move any node, and the layout does not re-fit over it afterwards.
 
 ### Physics, bounded settle time and pinned focus
 
@@ -99,8 +108,9 @@ for every failure.
 ### Stub nodes and truncation
 
 - [ ] High-degree nodes show a Stub indicating how many neighbors are hidden; a stub never counts as a real node (no Focus, no side panel).
-- [ ] When the neighborhood is truncated, the status line says so with the total, and "Raise limit to N" appears; raising it refetches and discards expansions (see Known limitations).
-- [ ] Ring counts (distance from the focus) are shown next to the controls and reflect the capped graph.
+- [ ] When the neighborhood is truncated, the status line says "of at least N" (the walk stops at the budget, so the total is a lower bound), and "Raise limit to N" appears; raising it refetches and discards expansions (see Known limitations).
+- [ ] Ring counts (Impact / Dependencies modes) are shown next to the controls; when the view is truncated, rings the walk never reached are not listed ("deeper rings not counted") instead of showing 0.
+- [ ] A type or declaration hierarchy bigger than the limit keeps the focus and the shallow rings (children before grandchildren), never an arbitrary slice by name.
 
 ### Visual encoding, labels, legend and filters
 
@@ -112,7 +122,7 @@ for every failure.
 - [ ] Zoomed out below about 0.6, only the Focus node is labelled; hovering a node labels it and its neighbors and highlights them.
 - [ ] Labels have a white backing and edges pass beneath them (no edge/label overlap). Labels are readable at default zoom on a 100-node graph.
 - [ ] Left-panel legend lists every node and edge kind with counts for the current view; unchecking a node kind hides those nodes and their edges at once (the Focus node never hides).
-- [ ] Unchecking an edge kind hides it and refetches with the `kinds` param (network tab).
+- [ ] Unchecking an edge kind hides it without a network request (visibility only).
 - [ ] The on-canvas mini legend (bottom-left) shows only visible and present kinds, and collapses and expands.
 
 ### Overview with Directory and Package grouping (whole fixtures)
@@ -125,6 +135,8 @@ for every failure.
 - [ ] "Group by: Package" regroups Ada by Package; C and C++ files appear as files; switching back restores Directory grouping.
 - [ ] The externals checkbox adds or removes the external Group (default off).
 - [ ] Choosing a search result from the Overview switches to the focus view.
+- [ ] Expanding a Group with more than 150 members shows the first 150 only and the status line says "members capped: showing 150 of N"; edges to hidden members are not drawn.
+- [ ] Group ids in the URL (`expanded=dir:ada`) are relative to the indexed root: no absolute server path appears in the URL or in any API response.
 
 ### URL deep-link and Back behaviour
 
@@ -140,10 +152,10 @@ for every failure.
 - C++ namespaces are not Groups in the Overview (Package grouping covers Ada only). Tracked in [#10](https://github.com/seifriedc/codegraph/issues/10).
 - The UI has never been exercised in a real browser by its implementers. The checklist above is the first real verification and must be run before release.
 - In focus views `contains` is drawn as an ordinary edge with a hollow diamond, not as nesting.
-- The Overview applies no node cap and never reports `truncated`.
 - Shift-Enter "add to canvas" does nothing in hierarchy views, and Shift-Enter merges are not stored in the URL.
 - Expansion pages only add edges to the owner node until the view is refetched.
-- Impact and dependencies ring counts reflect the capped graph, not the full reach.
+- The node limit is applied while walking, so once a view is truncated `total` and the ring counts are lower bounds: the walk stops at the ring that overflows the budget and deeper rings are never counted.
+- The Overview caps member nodes (150 by default, server maximum 500) but not Groups themselves; a directory with thousands of files still draws all of them as Groups. Edges to capped members are dropped.
 - Raising the node limit refetches and discards expansions.
 - The Overview `externals` API parameter now defaults to false.
 - Static HTML export is a later addition.
