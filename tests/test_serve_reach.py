@@ -67,11 +67,13 @@ def test_ring_counts_are_reported_per_depth(client):
     assert rings == {str(d): c for d, c in by_depth.items() if d >= 1}
 
 
-def test_ring_counts_stay_untruncated_when_limit_applies(client):
+def test_ring_counts_count_the_ring_that_overflowed_the_limit(client):
+    # the limit is applied during the walk: the ring that overflows is counted in full, deeper rings are not walked
     full = get(client, SHAPE, mode="impact", depth=2)
     cut = get(client, SHAPE, mode="impact", depth=2, limit=1)
     assert cut["truncated"] is True and len(cut["nodes"]) == 1
-    assert cut["ring_counts"] == full["ring_counts"]
+    assert cut["ring_counts"]["1"] == full["ring_counts"]["1"]
+    assert cut["total"] > 1
 
 
 def test_plain_neighborhood_has_no_ring_counts(client):

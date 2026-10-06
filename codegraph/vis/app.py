@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from codegraph.query import Graph
 from codegraph.vis import expand, focus, hierarchy, overview, search
 from codegraph.vis.models import StatsResponse
-from codegraph.vis.paths import common_root, make_relativizer
+from codegraph.vis.paths import make_relativizer
 
 
 def static_dir() -> Path:
@@ -39,7 +39,7 @@ def create_app(db_path: str | Path) -> FastAPI:
     def stats(g: Graph = Depends(get_graph)) -> dict:
         return g.demographics()
 
-    rel = make_relativizer(common_root([f["file_path"] for f in root.nodes(kind="file")]))
+    rel = make_relativizer(root.common_root())
     focus.register(app, get_graph, rel)
     expand.register(app, get_graph, rel)
     search.register(app, get_graph, rel)

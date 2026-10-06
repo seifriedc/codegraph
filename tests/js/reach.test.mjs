@@ -39,6 +39,11 @@ test("ringText lists per-ring counts up to the depth, zero-filling", () => {
   assert.equal(ringText(null, 2), "");
 });
 
+test("ringText does not zero-fill rings that a truncated walk never reached", () => {
+  assert.equal(ringText({ 1: 30 }, 3, true), "1: 30 · deeper rings not counted");
+  assert.equal(ringText({ 1: 30 }, 3, false), "1: 30 · 2: 0 · 3: 0");
+});
+
 test("fetchNeighborhood sends mode", async () => {
   let seen;
   await fetchNeighborhood("a", { depth: 10, mode: "impact" }, async (u) => { seen = u; return { status: 404 }; });

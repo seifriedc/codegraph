@@ -79,6 +79,8 @@ test("overviewStatus", () => {
   assert.equal(overviewStatus({ nodes: resp.nodes, edges: resp.edges, kinds: ["imports"] }),
     "Overview: 2 groups, 1 members, 2 aggregate edges (imports)");
   assert.match(overviewStatus({ nodes: [], edges: [], kinds: [] }), /no edge kinds/);
+  const cut = overviewStatus({ nodes: resp.nodes, edges: resp.edges, kinds: ["imports"], truncated: true, total: 412 });
+  assert.match(cut, /members capped: showing 1 of 410 /);
 });
 
 test("fetchOverview sends expanded ids as repeated params and an explicit kind list", async () => {

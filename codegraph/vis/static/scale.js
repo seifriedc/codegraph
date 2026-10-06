@@ -38,7 +38,7 @@ export function stubElements(stubs, presentIds) {
 /** Status line text. `shown`/`total` count real nodes (Stub nodes excluded). */
 export function scaleStatus({ shown, total, truncated, expanded = false }) {
   const fmt = (x) => x.toLocaleString("en-US");
-  if (truncated) return `Showing ${fmt(shown)} of ${fmt(total)} nodes (outer ring cut off)`;
+  if (truncated) return `Showing ${fmt(shown)} of at least ${fmt(total)} nodes (outer ring cut off)`;
   return `Showing ${fmt(shown)} node${shown === 1 ? "" : "s"}${expanded ? " (expanded)" : ""}`;
 }
 

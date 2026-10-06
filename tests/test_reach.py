@@ -53,10 +53,14 @@ def test_both_is_the_union_of_impact_and_dependencies(chain):
     }
 
 
-def test_ring_counts_are_untruncated_per_depth(chain):
+def test_ring_counts_are_exact_up_to_the_ring_that_overflowed_the_limit(chain):
+    # the walk stops at the ring that overflows the budget: it is counted in full (3), deeper
+    # rings are never walked, so total (4) is a lower bound of the true 5
     r = chain.reach(chain.ids["a"], mode="dependencies", depth=2, limit=2)
-    assert r["ring_counts"] == {1: 3, 2: 1}
-    assert r["truncated"] is True and r["total"] == 5 and len(r["nodes"]) == 2
+    assert r["ring_counts"] == {1: 3}
+    assert r["truncated"] is True and r["total"] == 4 and len(r["nodes"]) == 2
+    full = chain.reach(chain.ids["a"], mode="dependencies", depth=2)
+    assert full["ring_counts"] == {1: 3, 2: 1} and full["total"] == 5
 
 
 def test_reach_of_unknown_node_is_none(chain):

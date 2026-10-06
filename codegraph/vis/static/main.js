@@ -135,7 +135,7 @@ async function render() {
     }
     baseHood = hood;
     layeredView = layered;
-    $("rings").textContent = layered ? "" : ringText(hood.ring_counts, url.state.depth);
+    $("rings").textContent = layered ? "" : ringText(hood.ring_counts, url.state.depth, hood.truncated);
     if (layered) {
       canvas.showHierarchy(hood, url.state.view);
     } else {

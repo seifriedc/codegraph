@@ -126,7 +126,7 @@ test("stub elements: labelled node plus a connecting edge, flagged for styling",
 test("status line reports totals, truncation, stubs and the 300-node warning", () => {
   const b = base();
   assert.equal(scaleStatus({ shown: 3, total: 3, truncated: false }), "Showing 3 nodes");
-  assert.match(scaleStatus({ shown: 150, total: 1204, truncated: true }), /150 of 1,204.*outer ring/);
+  assert.match(scaleStatus({ shown: 150, total: 1204, truncated: true }), /150 of at least 1,204.*outer ring/);
   assert.match(scaleStatus({ shown: 320, total: 320, truncated: false, expanded: true }), /320 nodes \(expanded\)/);
 });
 

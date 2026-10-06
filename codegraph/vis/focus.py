@@ -6,34 +6,18 @@ from typing import Callable, Literal
 from fastapi import Depends, FastAPI, HTTPException, Query
 
 from codegraph.query import Graph
-from codegraph.vis.models import NeighborhoodResponse, NodeDetail, VisEdge, VisNode, VisStub
-
-DEFAULT_LIMIT = 150
-MAX_LIMIT = 500
-DEFAULT_PER_NODE_CAP = 15
-MAX_PER_NODE_CAP = 100
-MAX_DEPTH = 10
+from codegraph.vis.models import NeighborhoodResponse, NodeDetail
+from codegraph.vis.shape import (DEFAULT_LIMIT, DEFAULT_PER_NODE_CAP, MAX_DEPTH, MAX_LIMIT, MAX_PER_NODE_CAP,
+                                 Rel, csv_list, shape_edge, shape_node)
 
 
-def shape_node(n: dict, rel: Callable[[str | None], str | None]) -> VisNode:
-    is_file = n["kind"] == "file"
-    return VisNode(
-        id=n["id"], kind=n["kind"], name=n["name"],
-        qualified_name=rel(n["qualified_name"]) if is_file else n["qualified_name"],
-        path=rel(n["file_path"]),
-        line_start=n["line_start"], line_end=n["line_end"], language=n["language"],
-        depth=n.get("depth"),
-        external=n["file_path"] is None and not is_file,
-    )
-
-
-def register(app: FastAPI, get_graph: Callable, rel: Callable[[str | None], str | None]) -> None:
+def register(app: FastAPI, get_graph: Callable, rel: Rel) -> None:
     @app.get("/api/neighborhood/{node_id:path}", response_model=NeighborhoodResponse)
     def neighborhood(
         node_id: str,
         direction: Literal["in", "out", "both"] = "both",
         depth: int = Query(1, ge=0, le=MAX_DEPTH),
-        kinds: str | None = Query(None, description="comma-separated edge kinds"),
+        kinds: str | None = Query(None, description="comma-separated edge kinds (neighborhood mode)"),
         limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
         per_node_cap: int = Query(DEFAULT_PER_NODE_CAP, ge=1, le=MAX_PER_NODE_CAP),
         mode: Literal["neighborhood", "impact", "dependencies", "both"] | None = Query(
@@ -45,18 +29,17 @@ def register(app: FastAPI, get_graph: Callable, rel: Callable[[str | None], str 
         focus = g.resolve_node(node_id)
         if focus is None:
             raise HTTPException(404, f"node not found: {node_id}")
-        if mode and mode != "neighborhood":
+        if mode in ("impact", "dependencies", "both"):
             r = g.reach(focus["id"], mode=mode, depth=depth, limit=limit, per_node_cap=per_node_cap)
         else:
-            edge_kinds = [k for k in kinds.split(",") if k] if kinds else None
-            r = g.neighborhood(focus["id"], direction=direction, depth=depth,
-                               edge_kinds=edge_kinds, limit=limit, per_node_cap=per_node_cap)
+            r = g.neighborhood(focus["id"], direction=direction, depth=depth, edge_kinds=csv_list(kinds),
+                               limit=limit, per_node_cap=per_node_cap)
         return {
             "focus": focus["id"],
             "ring_counts": r.get("ring_counts"),
             "nodes": [shape_node(n, rel) for n in r["nodes"]],
-            "edges": [VisEdge(**{k: e[k] for k in ("id", "kind", "source_id", "target_id")}) for e in r["edges"]],
-            "stubs": [VisStub(**st) for st in r.get("stubs", [])],
+            "edges": [shape_edge(e) for e in r["edges"]],
+            "stubs": r["stubs"],
             "truncated": r["truncated"],
             "total": r["total"],
         }

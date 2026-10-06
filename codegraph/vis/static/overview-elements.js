@@ -54,5 +54,7 @@ export function overviewStatus(resp) {
   const groups = resp.nodes.filter((n) => n.group).length;
   const members = resp.nodes.length - groups;
   const kinds = resp.kinds.length ? ` (${resp.kinds.join(", ")})` : " (no edge kinds selected)";
-  return `Overview: ${groups} groups, ${members} members, ${resp.edges.length} aggregate edges${kinds}`;
+  // `total` counts Groups and members; only members are ever capped by the server
+  const capped = resp.truncated ? `; members capped: showing ${members} of ${resp.total - groups} (collapse a Group to see the rest)` : "";
+  return `Overview: ${groups} groups, ${members} members, ${resp.edges.length} aggregate edges${kinds}${capped}`;
 }
