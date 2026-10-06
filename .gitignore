@@ -15,5 +15,7 @@ build/
 # macOS
 .DS_Store
 
-CLAUDE.md
+# Claude
 .claude/
+
+.codegraph.db
