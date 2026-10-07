@@ -119,13 +119,6 @@ test("legend model lists all known kinds with counts and checked state", () => {
   assert.equal(m.edges.find((r) => r.kind === "calls").count, 4);
 });
 
-test("mini legend shows only visible kinds present in the view", () => {
-  const f = filters.toggleNodeKind(filters.defaultFilters(), "method");
-  const mini = legend.miniLegendModel(f, { nodes: { function: 3, method: 2 }, edges: { calls: 4, imports: 0 } });
-  assert.deepEqual(mini.nodes.map((r) => r.kind), ["function"]);
-  assert.deepEqual(mini.edges.map((r) => r.kind), ["calls"]);
-});
-
 test("every node shape has a legend swatch drawing", () => {
   for (const k of NODE_KINDS) assert.ok(legend.shapePoints(style.NODE_STYLE[k].shape), k);
 });

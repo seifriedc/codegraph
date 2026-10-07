@@ -1,4 +1,4 @@
-// Legend: left-panel kind filters and the collapsible on-canvas mini legend.
+// Legend: left-panel kind filters.
 // The models are pure; the render functions only touch the document they are given.
 import { EDGE_KINDS, EDGE_STYLE, FALLBACK_NODE_STYLE, NODE_KINDS, NODE_STYLE } from "./style.js";
 import { isEdgeKindVisible, isNodeKindVisible } from "./filters.js";
@@ -20,13 +20,6 @@ export function legendModel(filters, counts = { nodes: {}, edges: {} }) {
     nodes: rows(NODE_KINDS, counts.nodes || {}, isNodeKindVisible, filters),
     edges: rows(EDGE_KINDS, counts.edges || {}, isEdgeKindVisible, filters),
   };
-}
-
-/** Mini-legend model: only kinds that are visible (not filtered) and present in the current view. */
-export function miniLegendModel(filters, counts) {
-  const m = legendModel(filters, counts);
-  const keep = (r) => r.checked && r.count > 0;
-  return { nodes: m.nodes.filter(keep), edges: m.edges.filter(keep) };
 }
 
 // ---- swatches (SVG, 18x18 box) -------------------------------------------------------------------------------
@@ -121,22 +114,4 @@ export function renderLegend(root, model, { onToggleNode, onToggleEdge }, doc = 
     legendSection(doc, "Node kinds", model.nodes, nodeSwatch, onToggleNode),
     legendSection(doc, "Edge kinds", model.edges, edgeSwatch, onToggleEdge),
   );
-}
-
-/** Collapsible on-canvas legend (a <details>, so collapse state survives re-renders if `open` is passed back). */
-export function renderMiniLegend(root, mini, doc = root.ownerDocument) {
-  const wasOpen = root.querySelector("details") ? root.querySelector("details").open : true;
-  root.replaceChildren();
-  if (!mini.nodes.length && !mini.edges.length) return;
-  const d = el(doc, "details");
-  d.open = wasOpen;
-  d.append(el(doc, "summary", "Legend"));
-  for (const [items, swatch] of [[mini.nodes, nodeSwatch], [mini.edges, edgeSwatch]]) {
-    for (const r of items) {
-      const row = el(doc, "div", null, "legend-row");
-      row.append(swatch(doc, r.kind), el(doc, "span", r.kind, "legend-kind"));
-      d.append(row);
-    }
-  }
-  root.append(d);
 }

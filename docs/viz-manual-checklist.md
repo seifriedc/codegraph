@@ -122,7 +122,6 @@ for every failure.
 - [ ] Labels have a white backing and edges pass beneath them (no edge/label overlap). Labels are readable at default zoom on a 100-node graph.
 - [ ] Left-panel legend lists every node and edge kind with counts for the current view; unchecking a node kind hides those nodes and their edges at once (the Focus node never hides).
 - [ ] Unchecking an edge kind hides it without a network request (visibility only).
-- [ ] The on-canvas mini legend (bottom-left) shows only visible and present kinds, and collapses and expands.
 
 ### Overview with Directory and Package grouping (whole fixtures)
 
