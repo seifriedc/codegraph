@@ -33,12 +33,6 @@
     .legend-row.off { opacity: 0.45; }
     .legend-kind { flex: 1; }
     .legend-count { color: var(--muted); font-variant-numeric: tabular-nums; }
-    #mini-legend { position: absolute; left: 8px; bottom: 8px; max-height: 60%; overflow: auto; z-index: 5;
-                   background: rgba(255,255,255,0.92); border: 1px solid var(--border); border-radius: 4px;
-                   padding: 4px 8px; font-size: 12px; }
-    #mini-legend:empty { display: none; }
-    #mini-legend summary { cursor: pointer; color: var(--muted); }
-    #mini-legend .legend-row { cursor: default; }
     #panel { display: flex; flex-direction: column; min-height: 0; background: var(--panel-bg); border-left: 1px solid var(--border); }
     #details { flex: 1; overflow: auto; padding: 12px; }
     #details-actions { padding: 8px 12px 0; }
@@ -134,7 +128,7 @@
       </div>
     </div>
   </aside>
-  <div id="stage"><div id="cy"></div><div id="empty" hidden></div><div id="mini-legend"></div><div id="tip" hidden></div></div>
+  <div id="stage"><div id="cy"></div><div id="empty" hidden></div><div id="tip" hidden></div></div>
   <aside id="panel">
     <div id="details-actions" class="overview-only">
       <button id="ov-focus" type="button" disabled title="Open the selected node in the focus view">Focus</button>

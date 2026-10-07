@@ -4,7 +4,7 @@ import { fetchExpand, fetchHierarchy, fetchNeighborhood, fetchNode, fetchOvervie
 import { HIERARCHY_MODES } from "./hierarchy_layout.js";
 import { createCanvas } from "./canvas.js";
 import { toggleEdgeKind, toggleNodeKind } from "./filters.js";
-import { countKinds, legendModel, miniLegendModel, renderLegend, renderMiniLegend } from "./legend.js";
+import { countKinds, legendModel, renderLegend } from "./legend.js";
 import { createAlerts } from "./alerts.js";
 import { mountAlertButton } from "./alert-ui.js";
 import { renderPanel } from "./panel.js";
@@ -77,7 +77,6 @@ function enterView(view) {
   if (view === "overview") {
     // the legend and kind filters belong to the focus view; the overview has its own kind checkboxes
     $("legend").replaceChildren();
-    $("mini-legend").replaceChildren();
     // Landing hook: the search box takes focus whenever the overview is entered.
     document.dispatchEvent(new CustomEvent("codegraph:landing"));
     search.focusInput();
@@ -96,7 +95,6 @@ function drawLegends() {
     onToggleNode: (k) => applyFilters(toggleNodeKind(url.state.filters, k)),
     onToggleEdge: (k) => applyFilters(toggleEdgeKind(url.state.filters, k)),
   });
-  renderMiniLegend($("mini-legend"), miniLegendModel(url.state.filters, counts));
 }
 
 /** Neighborhood query for the current URL state: direction and kinds apply in neighborhood mode only. */
