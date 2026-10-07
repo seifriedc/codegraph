@@ -34,7 +34,7 @@ def test_package_mode_groups_are_ada_packages_and_c_cpp_files(client):
 def test_nested_packages_collapse_and_expand_via_contains(client):
     first = client.get("/api/overview", params=PKG).json()
     outer, geometry = by_name(first, "package")["Outer"], by_name(first, "package")["Geometry"]
-    assert outer["member_count"] >= 3  # Outer, Inner, Ping (+ its file)
+    assert outer["member_count"] >= 3  # Outer, Inner, Ping
     assert "Inner" not in by_name(first, "package") and "Utils" not in by_name(first, "package")
 
     second = client.get(
@@ -80,3 +80,13 @@ def test_externals_hidden_by_default_and_one_external_group_when_shown(client, g
         params={"group_by": group_by, "externals": "true", "expanded": [externals[0]["id"]]},
     ).json()
     assert "Sqrt" in {n["name"] for n in drilled["nodes"] if n["parent"] == "external"}
+
+
+def test_package_mode_never_lists_file_nodes_as_members(client):
+    first = client.get("/api/overview", params=PKG).json()
+    pkg_ids = [n["id"] for n in first["nodes"] if n["group"] and n["kind"] == "package"]
+    second = client.get("/api/overview", params={**PKG, "expanded": pkg_ids}).json()
+    nested = [n["id"] for n in second["nodes"] if n["group"] and n["kind"] == "package"]
+    body = client.get("/api/overview", params={**PKG, "expanded": nested}).json()
+    # file Groups (C/C++) are Groups; a file *member* of a Package is noise
+    assert [n["name"] for n in body["nodes"] if not n["group"] and n["kind"] == "file"] == []

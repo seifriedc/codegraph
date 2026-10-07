@@ -75,12 +75,20 @@ class _Grouping:
                `node_id` is the real node a Group is (a file, a package), else None.
     group_of:  {node id: id of the innermost Group it belongs to}; a Group's own node is
                placed in that Group. Nodes absent from `group_of` are not shown.
+    attached:  {node id: Group id} for nodes that stand for a Group on Aggregate edges but
+               are never listed or counted as its members (e.g. a Package's file node).
     member_counts: {group id: nodes placed in the Group or any descendant}.
     """
 
-    def __init__(self, groups: dict[str, dict], group_of: dict[str, str]):
+    def __init__(
+        self,
+        groups: dict[str, dict],
+        group_of: dict[str, str],
+        attached: dict[str, str] | None = None,
+    ):
         self.groups = groups
         self.group_of = group_of
+        self.attached = attached or {}
         self.member_counts = {gid: 0 for gid in groups}
         for gid in group_of.values():
             while gid is not None:
@@ -645,6 +653,9 @@ class Graph:
 
         def visible_item(node_id: str) -> str | None:
             """Id of what stands for a node in the current view (a Group or the node)."""
+            if node_id in grouping.attached:
+                gid = grouping.attached[node_id]
+                return collapsed_at(gid) or gid
             gid = grouping.group_of.get(node_id)
             if gid is None:
                 return None
@@ -792,7 +803,8 @@ class Graph:
         Mixed repos: a node goes in its innermost containing Package, else in its file's
         Group. A file node goes in the Package its file contains (so `imports` edges from
         an Ada file attach to that Package) unless the file also has nodes outside any
-        Package, in which case it is their file Group. External placeholders (no
+        Package, in which case it is their file Group. A file node attached to a Package is
+        never listed as one of its members. External placeholders (no
         `file_path`, including external Packages) go in one `external` Group when
         `externals`.
         """
@@ -862,14 +874,15 @@ class Graph:
                 group_of[nid] = file_group(r["file_path"])
             elif externals:
                 group_of[nid] = self._external_group(groups)
+        attached: dict[str, str] = {}
         for path, f in files.items():
             if f["id"] in groups:
                 group_of[f["id"]] = f["id"]
             elif f["id"] in owner_file:
-                group_of[f["id"]] = owner_file[f["id"]]
+                attached[f["id"]] = owner_file[f["id"]]
             else:
                 group_of[f["id"]] = file_group(path)
-        return _Grouping(groups, group_of)
+        return _Grouping(groups, group_of, attached)
 
     _GROUPINGS = {"directory": _directory_grouping, "package": _package_grouping}
 
