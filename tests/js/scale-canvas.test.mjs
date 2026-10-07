@@ -81,15 +81,14 @@ test("an expansion keeps existing positions, spawns near the owner, highlights n
   canvas.destroy();
 });
 
-test("resetZoom returns to 100% without moving any node and stops auto-fit", () => {
+test("recenter (the Toolbar's Fit) re-frames the view without moving any node", () => {
   const { canvas, cy } = setup();
   const m = createModel();
   m.reset(base);
   canvas.show(m.view());
-  cy.zoom(0.4);
   const pos = cy.nodes().map((n) => ({ ...n.position() }));
-  canvas.resetZoom(false);
-  assert.equal(cy.zoom(), 1);
+  cy.zoom(0.4);
+  canvas.recenter(false);
   assert.deepEqual(cy.nodes().map((n) => ({ ...n.position() })), pos);
   canvas.destroy();
 });

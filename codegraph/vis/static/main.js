@@ -5,6 +5,8 @@ import { HIERARCHY_MODES } from "./hierarchy_layout.js";
 import { createCanvas } from "./canvas.js";
 import { toggleEdgeKind, toggleNodeKind } from "./filters.js";
 import { countKinds, legendModel, miniLegendModel, renderLegend, renderMiniLegend } from "./legend.js";
+import { createAlerts } from "./alerts.js";
+import { mountAlertButton } from "./alert-ui.js";
 import { renderPanel } from "./panel.js";
 import { BUDGET, createModel, nextLimit, scaleStatus } from "./scale.js";
 import { depthOptions, directionEnabled, MODES, ringText } from "./reach.js";
@@ -16,6 +18,12 @@ import { createOverviewView, overviewStyle } from "./overview-view.js";
 import { createUrlController, notFoundMessage, replayStubs } from "./urlstate.js";
 
 const $ = (id) => document.getElementById(id);
+const NO_FOCUS = "No focus node. Select a node in the overview, or search for one.";
+const alerts = createAlerts();
+mountAlertButton($("alerts"), alerts);
+const raiseError = (err) => alerts.set("error", "error", `Error: ${err.message}`);
+/** A message centred on the canvas for a view that has nothing to draw; "" hides it. */
+const setEmpty = (text) => { $("empty").textContent = text; $("empty").hidden = !text; };
 const setLayoutState = (s) => { $("layout-state").textContent = s === "running" ? "settling" : "settled"; };
 
 const canvas = createCanvas($("cy"), {
@@ -42,7 +50,7 @@ const overview = createOverviewView(canvas.cy, {
 const url = createUrlController({
   location, history,
   render: () => render(),
-  notice: (text) => { $("trunc").textContent = text; $("trunc").hidden = !text; },
+  notice: (text) => { if (text) alerts.set("url-truncated", "alert", text); else alerts.resolve("url-truncated"); },
 });
 const setState = (patch) => url.apply(patch);
 const model = createModel(); // focus neighborhood + accumulated expansions (scale policy)
@@ -55,7 +63,7 @@ let requestSeq = 0; // ignore responses that arrive after a newer request
 // ---- Overview (landing view): see overview-controller.js ----
 let shownView = null;   // which view the canvas currently holds; elements are cleared on a switch
 const ovc = createOverviewController({
-  $, canvas, overview, url, setState, fetchOverview, fetchNode, renderPanel, isCurrent: (seq) => seq === requestSeq,
+  $, canvas, overview, url, setState, fetchOverview, fetchNode, renderPanel, isCurrent: (seq) => seq === requestSeq, onError: raiseError,
 });
 
 function enterView(view) {
@@ -99,7 +107,9 @@ function hoodParams() {
 
 async function render() {
   const seq = ++requestSeq;
+  alerts.resolve("error"); // a fresh render supersedes the last failure
   enterView(url.state.view === "overview" ? "overview" : "focus");
+  setEmpty("");
   $("view").value = url.state.view;
   if (url.state.view === "overview") return ovc.render(seq);
   $("depth").value = String(url.state.depth);
@@ -109,8 +119,9 @@ async function render() {
   $("rings").textContent = "";
   canvas.setFilters(url.state.filters); // kind filters come from the URL (also after Back/Forward)
   if (!url.state.focus) {
-    $("status").textContent = "No focus node. Open the page with #focus=<node id or qualified name>.";
-    renderPanel($("panel"), null);
+    $("status").textContent = NO_FOCUS;
+    setEmpty(NO_FOCUS);
+    renderPanel($("details"), null);
     return;
   }
   try {
@@ -129,7 +140,8 @@ async function render() {
       counts = { nodes: {}, edges: {} };
       drawLegends();
       $("status").textContent = notFoundMessage(url.state.focus);
-      renderPanel($("panel"), null);
+      setEmpty(notFoundMessage(url.state.focus));
+      renderPanel($("details"), null);
       search.focusInput();
       return;
     }
@@ -147,9 +159,9 @@ async function render() {
       canvas.show(model.view());
     }
     updateScaleUi();
-    renderPanel($("panel"), detail);
+    renderPanel($("details"), detail);
   } catch (err) {
-    if (seq === requestSeq) $("status").textContent = `Error: ${err.message}`;
+    if (seq === requestSeq) raiseError(err);
   }
 }
 
@@ -166,8 +178,18 @@ function updateScaleUi() {
   raise.hidden = !canRaise;
   if (canRaise) raise.textContent = `Raise limit to ${nextLimit(url.state.limit)}`;
   $("undo").disabled = layeredView || !model.canUndo();
-  $("warn").hidden = layeredView || !model.overWarning();
-  if (!$("warn").hidden) $("warn-text").textContent = `${model.size} nodes on screen: the graph is getting crowded.`;
+  if (!layeredView && model.overWarning()) {
+    alerts.set("crowded", "alert", `${model.size} nodes on screen: the graph is getting crowded.`,
+      { label: "Prune to focus neighborhood", run: prune });
+  } else alerts.resolve("crowded");
+}
+
+/** Drop all expansions, keep the focus neighborhood. */
+function prune() {
+  model.prune();
+  setState({ stubs: [] });
+  canvas.show(model.view());
+  updateScaleUi();
 }
 
 /** Click on a Stub node: page in its hidden neighbors, merge, highlight what is new. */
@@ -184,7 +206,7 @@ async function expandStub(stub) {
     updateScaleUi();
     if (budgetHit) $("status").textContent += `. Node limit (${BUDGET.maxLimit}) reached: prune or undo to continue.`;
   } catch (err) {
-    $("status").textContent = `Error: ${err.message}`;
+    raiseError(err);
   } finally {
     expanding.delete(stub.id);
   }
@@ -195,7 +217,12 @@ for (const m of MODES) $("mode").append(new Option(m.label, m.value));
 $("depth").addEventListener("change", (e) => setState({ depth: Number(e.target.value) }));
 $("mode").addEventListener("change", (e) => setState({ mode: e.target.value }));
 $("direction").addEventListener("change", (e) => setState({ direction: e.target.value }));
-$("view").addEventListener("change", (e) => setState({ view: e.target.value }));
+$("view").addEventListener("change", (e) => {
+  const view = e.target.value;
+  // Leaving the overview with no Focus node yet: focus the selected node, as the Focus button does.
+  const carry = view !== "overview" && !url.state.focus ? ovc.selectedNodeId() : null;
+  setState(carry ? { view, focus: carry } : { view });
+});
 $("raise-limit").addEventListener("click", () => setState({ limit: nextLimit(url.state.limit) }));
 $("undo").addEventListener("click", () => {
   if (!model.undo()) return;
@@ -203,14 +230,7 @@ $("undo").addEventListener("click", () => {
   canvas.show(model.view(), { expansion: true });
   updateScaleUi();
 });
-$("prune").addEventListener("click", () => {
-  model.prune();
-  setState({ stubs: [] });
-  canvas.show(model.view());
-  updateScaleUi();
-});
-$("recenter").addEventListener("click", () => canvas.recenter());
-$("reset-zoom").addEventListener("click", () => canvas.resetZoom());
+$("fit").addEventListener("click", () => canvas.recenter());
 addEventListener("hashchange", () => url.onHashChange());
 
 drawLegends();
@@ -229,7 +249,7 @@ export const search = mountSearch($("search"), {
       baseHood = { ...baseHood, truncated: baseHood.truncated || merged.truncated || dropped > 0 };
       canvas.show(model.view(), { anchor: n.id, expansion: true, highlight: newIds });
       updateScaleUi();
-    } catch (err) { $("status").textContent = `Error: ${err.message}`; }
+    } catch (err) { raiseError(err); }
   },
 });
 

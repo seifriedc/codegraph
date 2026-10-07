@@ -43,3 +43,37 @@ _Avoid_: Blast radius, callers (callers are only the `calls` subset)
 **Dependencies**:
 The Neighborhood over the outgoing equivalents of the Impact set's edges: what the Focus node relies on.
 _Avoid_: Callees
+
+## UI
+
+**View**:
+One of the four ways to lay out the graph: overview, focus, type hierarchy or declaration hierarchy.
+_Avoid_: Mode (reserved for the Focus view's choice of which edges to show), page
+
+**Toolbar**:
+The top bar holding the controls that are the same in every View: search, the View switcher, fit-to-view, undo expand and raise limit. Its layout does not change between Views.
+_Avoid_: Header, top bar
+
+**Controls panel**:
+The left-hand panel: the Legend on top, with the View controls pinned to the bottom.
+_Avoid_: Sidebar, left panel
+
+**Legend**:
+The section of the Controls panel listing node and edge kinds with counts, used to show or hide each kind.
+_Avoid_: Filter list
+
+**View controls**:
+The settings specific to the current View (e.g. Group by in the overview; Show, Direction and Depth in focus), shown at the bottom of the Controls panel.
+_Avoid_: Options, per-view toolbar
+
+**Details panel**:
+The right-hand panel describing the selected node. A Status section is pinned below its scrolling details.
+_Avoid_: Side panel, inspector
+
+**Status section**:
+The footer of the Details panel showing passive readouts about the current View (counts, layout settling, nodes per ring).
+_Avoid_: Status bar
+
+**Alert button**:
+The Toolbar control that signals active warnings and errors. It changes colour with the worst active severity, and clicking it lists the messages.
+_Avoid_: Notification bell, banner
