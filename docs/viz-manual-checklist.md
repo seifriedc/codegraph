@@ -82,12 +82,11 @@ for every failure.
 - [ ] Switching Show to Impact set, Dependencies or Impact + dependencies disables the Direction select (those modes fix their own direction and edge kinds); switching back re-enables it with the previous value.
 - [ ] A hand-edited `kinds=inherits,contains` in the URL restricts the fetched edges to those kinds in Neighborhood mode (the legend filters remain client-side visibility only and never refetch).
 
-### Recenter, Reset zoom and fit-all
+### Fit
 
-- [ ] After panning and zooming far away, Recenter fits every node in view with comfortable margins.
-- [ ] After expanding a node that adds nodes off-screen, Recenter brings them in view.
-- [ ] Recenter does not move any node or restart the layout.
-- [ ] "Reset zoom" returns to 100% about the middle of the view, in the focus view, a hierarchy view and the Overview; it does not move any node, and the layout does not re-fit over it afterwards.
+- [ ] After panning and zooming far away, Fit fits every node in view with comfortable margins.
+- [ ] After expanding a node that adds nodes off-screen, Fit brings them in view.
+- [ ] Fit does not move any node or restart the layout.
 
 ### Physics, bounded settle time and pinned focus
 
@@ -102,7 +101,7 @@ for every failure.
 
 - [ ] Clicking a Stub node (a node showing it has hidden neighbors) pages in those neighbors next to it; new nodes and edges are highlighted briefly, then the highlight fades.
 - [ ] Undo expand removes exactly the last expansion (nodes and edges), restores the previous view, and disables itself when nothing is left to undo. Repeated undo walks back one step at a time.
-- [ ] Expanding past the node budget stops with "Node limit (500) reached: prune or undo to continue." and a warning appears at 300 nodes with a "Prune to focus neighborhood" button that drops all expansions.
+- [ ] Expanding past the node budget stops with "Node limit (500) reached: prune or undo to continue." and at 300 nodes the Alert button turns amber; its popover lists the crowded-graph message with a "Prune to focus neighborhood" button that drops all expansions.
 - [ ] Reload and Back/forward restore the expansion state from the URL (see URL behaviour).
 
 ### Stub nodes and truncation
@@ -146,6 +145,15 @@ for every failure.
 - [ ] After Back, the previous Focus node is selected and the side panel matches it.
 - [ ] A hand-edited hash with more than 50 expanded ids is capped and a notice says so.
 
+### Toolbar, Controls panel, Details panel and Alert button
+- [ ] Switching between Overview, Focus and the hierarchy views never moves the search box, View dropdown, Fit, Undo expand or the Alert button.
+- [ ] The Controls panel shows the Legend on top and the View controls pinned at the bottom: Group by, externals and edge kinds in the Overview; Show, Direction and Depth otherwise.
+- [ ] The Details panel keeps its Status section (counts, nodes per ring, settling/settled) visible at the bottom while the details above scroll.
+- [ ] In the Overview the Focus button sits at the top of the Details panel and is enabled only when a node is selected.
+- [ ] The Alert button is grey with nothing to report. A fetch failure turns it red; the crowded-graph and truncated-URL messages turn it amber. A count badge shows how many messages there are.
+- [ ] Clicking it opens a popover; clicking outside closes it. "x" dismisses one message and "Clear all" dismisses all. A dismissed message stays hidden while its condition persists and returns after the condition clears and recurs.
+- [ ] Choosing "focus" (or a hierarchy view) in the View dropdown with a node selected in the Overview focuses that node. With nothing selected, or a Group selected, the canvas shows "No focus node. Select a node in the overview, or search for one."
+
 ## Known limitations in v1
 
 - Same-named entities merge into one node, so an Ada package and a C++ class with the same name share an id and neighbors. Tracked in [#14](https://github.com/seifriedc/codegraph/issues/14).
@@ -160,3 +168,4 @@ for every failure.
 - The Overview `externals` API parameter now defaults to false.
 - Static HTML export is a later addition.
 - Playwright end-to-end tests (including DB-versus-visualization checks) are not written. Tracked in [#15](https://github.com/seifriedc/codegraph/issues/15).
+- Clicking a node in the Overview only selects it; it does not set the Focus node. The selection is the pending focus: the Focus button and the View dropdown both focus it. Setting the Focus node on every click would put it in the URL, which has two costs: each click refetches and re-renders the Overview, and (the Focus node being a navigation key) each click adds a history entry, so Back would step through every node clicked instead of through views. If ever wanted, the click should replace the current history entry rather than push, and skip the refetch.

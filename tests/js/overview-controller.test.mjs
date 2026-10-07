@@ -20,7 +20,7 @@ function setup({ nodes, details = {} }) {
   const panel = []; // every renderPanel call: the detail it was given
   const ctl = createOverviewController({
     $, canvas, overview: { show() {} }, url: { state: { expanded: [], groupBy: "directory", externals: false, okinds: null } },
-    setState() {}, isCurrent: () => true,
+    setState() {}, isCurrent: () => true, onError() {},
     fetchOverview: async () => ({ available_kinds: [], kinds: [] }),
     fetchNode: async (id) => details[id] ?? null,
     renderPanel: (_root, detail) => panel.push(detail),
@@ -59,4 +59,13 @@ test("re-rendering keeps the selected node's details; deselecting clears them", 
   assert.equal(panel.at(-1), detail);
   ctl.select(null);
   assert.equal(panel.at(-1), null);
+});
+
+test("selectedNodeId is the selected node, and null for a Group or no selection", () => {
+  const { ctl } = setup({ nodes: { a: { id: "a", nodeId: "n1", full: "x" }, g: { id: "g", full: "dir" } } });
+  assert.equal(ctl.selectedNodeId(), null);
+  ctl.tap("a");
+  assert.equal(ctl.selectedNodeId(), "n1");
+  ctl.tap("g");
+  assert.equal(ctl.selectedNodeId(), null);
 });

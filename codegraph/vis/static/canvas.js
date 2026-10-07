@@ -55,7 +55,7 @@ export function createCanvas(container, { cytoscape, d3, dagre, onTapNode = () =
     });
   }
 
-  /** Fit all elements in view. Also the "recenter" button's action. */
+  /** Fit all elements in view. Also the Toolbar "Fit" button's action. */
   function recenter(animate = true) {
     cy.resize();
     if (cy.elements().empty()) return;
@@ -71,16 +71,6 @@ export function createCanvas(container, { cytoscape, d3, dagre, onTapNode = () =
     cy.resize();
     cy.stop();
     cy.animate({ center: { eles: ele } }, { duration: 400, easing: "ease-in-out-cubic" });
-  }
-
-  /** Reset the zoom to 100% about the centre of the viewport (pan position of that centre is kept). */
-  function resetZoom(animate = true) {
-    cy.resize();
-    autoFit = false; // the user chose a zoom: the layout must not re-fit over it
-    const level = 1;
-    const renderedPosition = { x: cy.width() / 2, y: cy.height() / 2 };
-    if (animate) cy.animate({ zoom: { level, renderedPosition } }, { duration: 250 });
-    else cy.zoom({ level, renderedPosition });
   }
 
   let freshTimer = null;
@@ -161,5 +151,5 @@ export function createCanvas(container, { cytoscape, d3, dagre, onTapNode = () =
 
   function destroy() { layout.stop(); cy.destroy(); }
 
-  return { cy, show, showHierarchy, highlight, recenter, resetZoom, setFilters, destroy, layout };
+  return { cy, show, showHierarchy, highlight, recenter, setFilters, destroy, layout };
 }

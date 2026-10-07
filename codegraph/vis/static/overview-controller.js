@@ -2,25 +2,24 @@
 // render of one /api/overview response. DOM access goes through the injected `$` (id -> element).
 import { overviewStatus, toggleExpanded } from "./overview-elements.js";
 
-export function createOverviewController({ $, canvas, overview, url, setState, fetchOverview, fetchNode, renderPanel, isCurrent }) {
+export function createOverviewController({ $, canvas, overview, url, setState, fetchOverview, fetchNode, renderPanel, isCurrent, onError }) {
   let selected = null; // {id, nodeId, name} of the selected overview node
 
   function select(data) {
     selected = data ? { id: data.id, nodeId: data.nodeId, name: data.full } : null;
-    $("ov-selection").textContent = selected ? selected.name : "";
     $("ov-focus").disabled = !(selected && selected.nodeId);
     showDetails(selected);
   }
 
   /** Fill the Details panel for the selection; Groups have no node, so they (and no selection) show the placeholder. */
   async function showDetails(sel) {
-    renderPanel($("panel"), null);
+    renderPanel($("details"), null);
     if (!sel || !sel.nodeId) return;
     try {
       const detail = await fetchNode(sel.nodeId);
-      if (selected === sel && detail) renderPanel($("panel"), detail); // drop a response for an earlier click
+      if (selected === sel && detail) renderPanel($("details"), detail); // drop a response for an earlier click
     } catch (err) {
-      if (selected === sel) $("status").textContent = `Error: ${err.message}`;
+      if (selected === sel) onError(err);
     }
   }
 
@@ -62,7 +61,7 @@ export function createOverviewController({ $, canvas, overview, url, setState, f
       if (selected && !canvas.cy.getElementById(selected.id).length) select(null);
       else if (selected) canvas.cy.getElementById(selected.id).select();
     } catch (err) {
-      if (isCurrent(seq)) $("status").textContent = `Error: ${err.message}`;
+      if (isCurrent(seq)) onError(err);
     }
   }
 
@@ -72,9 +71,11 @@ export function createOverviewController({ $, canvas, overview, url, setState, f
   $("ov-focus").addEventListener("click", () => {
     if (selected && selected.nodeId) setState({ view: "focus", focus: selected.nodeId, expanded: [] });
   });
-  $("ov-home").addEventListener("click", () => setState({ view: "overview", focus: null }));
   // clicking empty canvas clears the selection
   canvas.cy.on("tap", (evt) => { if (evt.target === canvas.cy && url.state.view === "overview") select(null); });
 
-  return { select, tap, render };
+  /** The selected node id (null for no selection or a Group): what a switch to another View should focus on. */
+  const selectedNodeId = () => (selected && selected.nodeId) || null;
+
+  return { select, tap, render, selectedNodeId };
 }
